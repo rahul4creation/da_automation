@@ -88,8 +88,8 @@ button {
 .create-panel input,
 .create-panel select,
 .notes-input,
-.gate-table input,
-.gate-table select {
+.gate-card input,
+.gate-card select {
   width: 100%;
   min-width: 0;
   border: 1px solid #c6d0db;
@@ -101,8 +101,8 @@ button {
 
 .create-panel input,
 .create-panel select,
-.gate-table input,
-.gate-table select {
+.gate-card input,
+.gate-card select {
   min-height: 36px;
   padding: 8px 9px;
 }
@@ -207,6 +207,7 @@ button {
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+  min-width: 0;
 }
 
 .phase-rail {
@@ -252,6 +253,7 @@ button {
   gap: 14px;
   padding: 14px;
   border-radius: 8px;
+  min-width: 0;
 }
 
 .phase-header {
@@ -262,6 +264,100 @@ button {
   padding: 14px;
   border-radius: 8px;
   background: #fbfcfd;
+  min-width: 0;
+}
+
+.phase-guide {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.guide-card {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 9px;
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid #d7dee6;
+  border-radius: 8px;
+  background: #fbfcfd;
+  min-width: 0;
+}
+
+.guide-card svg {
+  color: #0b6b8f;
+}
+
+.guide-card strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #24364b;
+  font-size: 13px;
+}
+
+.guide-card p {
+  margin: 0;
+  color: #4b596a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.gate-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #d7dee6;
+  border-radius: 8px;
+  background: #f8fbfc;
+}
+
+.gate-summary h4 {
+  margin: 0;
+  color: #24364b;
+  font-size: 16px;
+}
+
+.gate-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 8px;
+  min-width: min(100%, 380px);
+}
+
+.metric {
+  display: grid;
+  min-width: 76px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #d7dee6;
+}
+
+.metric strong {
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.metric span {
+  color: #627084;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.metric.good strong {
+  color: #1f8a4c;
+}
+
+.metric.warn strong {
+  color: #bf6b00;
+}
+
+.metric.bad strong {
+  color: #a33b2f;
 }
 
 .phase-header h3 {
@@ -278,7 +374,14 @@ button {
   display: grid;
   justify-items: end;
   gap: 6px;
+  max-width: 280px;
+  min-width: 0;
   text-align: right;
+}
+
+.phase-status-stack span,
+.topbar-meta span {
+  overflow-wrap: anywhere;
 }
 
 .workbench-actions {
@@ -326,6 +429,10 @@ button {
   opacity: 0.55;
 }
 
+.primary-btn:disabled {
+  background: #8da2b3;
+}
+
 .artifact-strip,
 .gate-panel,
 .output-panel {
@@ -362,54 +469,68 @@ button {
   gap: 12px;
 }
 
-.gate-table-block {
+.gate-section {
   display: grid;
   gap: 8px;
 }
 
-.gate-table-block h4 {
+.gate-section h4 {
   margin: 6px 0 0;
   color: #24364b;
   font-size: 14px;
 }
 
-.gate-table {
+.gate-card-list {
   display: grid;
-  border: 1px solid #d7dee6;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.gate-table-head,
-.gate-table-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) minmax(140px, 0.6fr) minmax(160px, 1fr) minmax(120px, 0.7fr) minmax(160px, 1fr);
   gap: 10px;
-  align-items: center;
 }
 
-.gate-table-head {
-  padding: 9px 10px;
-  background: #e8eef4;
-  color: #24364b;
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
+.gate-card {
+  display: grid;
+  grid-template-columns: minmax(230px, 1.3fr) minmax(140px, 0.5fr) minmax(180px, 0.9fr) minmax(130px, 0.6fr) minmax(180px, 0.9fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #d7dee6;
+  border-left-width: 5px;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
-.gate-table-row {
-  padding: 10px;
-  border-top: 1px solid #e3e8ee;
+.gate-card.complete {
+  border-left-color: #1f8a4c;
 }
 
-.gate-table-row strong,
-.gate-table-row small {
+.gate-card.incomplete {
+  border-left-color: #bf6b00;
+}
+
+.gate-card.blocked {
+  border-left-color: #a33b2f;
+}
+
+.gate-card.not-applicable {
+  border-left-color: #627084;
+}
+
+.gate-card-main strong,
+.gate-card-main small,
+.gate-card label,
+.gate-card label span {
   display: block;
 }
 
-.gate-table-row small {
+.gate-card-main small {
   margin-top: 4px;
   line-height: 1.35;
+}
+
+.gate-card label span {
+  margin-bottom: 4px;
+  color: #627084;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .output-panel pre {
@@ -532,7 +653,7 @@ button {
   }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1500px) {
   .app-shell {
     grid-template-columns: 280px 1fr;
   }
@@ -543,6 +664,25 @@ button {
 
   .phase-rail {
     position: static;
+  }
+
+  .phase-list {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+
+  .gate-card {
+    grid-template-columns: minmax(220px, 1fr) minmax(150px, 180px);
+  }
+}
+
+@media (max-width: 1180px) {
+  .phase-guide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gate-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
@@ -572,12 +712,9 @@ button {
     text-align: left;
   }
 
-  .gate-table {
-    overflow-x: auto;
-  }
-
-  .gate-table-head,
-  .gate-table-row {
-    min-width: 920px;
+  .phase-guide,
+  .gate-metrics,
+  .gate-card {
+    grid-template-columns: 1fr;
   }
 }

@@ -8,6 +8,7 @@ import {
   Play,
   RefreshCw,
   Save,
+  ShieldCheck,
   Upload,
   XCircle
 } from "lucide-react";
@@ -27,6 +28,51 @@ import {
 const statusOptions = ["Complete", "Incomplete", "Blocked", "Not applicable"] as const;
 
 type Toast = { type: "success" | "error" | "info"; message: string } | null;
+
+const phaseGuidance: Record<string, { userAction: string; uploads: string; output: string; gateFocus: string }> = {
+  "01-requirement-intake": {
+    userAction: "Capture the business request, KPI expectations, audience, platform path, and acceptance criteria.",
+    uploads: "Tickets, emails, screenshots, sample Excel files, current report exports, or meeting notes.",
+    output: "Requirement brief, KPI catalog, assumptions, open questions, and Phase 2 handoff.",
+    gateFocus: "Business objective, stakeholders, KPI definitions, scope, security, and testable acceptance criteria."
+  },
+  "02-ai-analysis-understanding": {
+    userAction: "Map the approved requirement to data sources, tables, columns, grains, joins, and risks.",
+    uploads: "Database schema, DDL, sample rows, data dictionary, existing SQL, current report logic, or owner notes.",
+    output: "Source-to-report mapping, join model, data quality risks, and validation plan.",
+    gateFocus: "Every KPI/filter/output field is mapped or explicitly questioned before SQL starts."
+  },
+  "03-sql-draft-logic-preparation": {
+    userAction: "Draft PostgreSQL logic and validation queries from the approved mapping.",
+    uploads: "Approved mapping, SQL snippets, schema updates, sample expected outputs, or reconciliation files.",
+    output: "Main SQL draft, SQL logic notes, validation query set, assumptions, and review focus.",
+    gateFocus: "Traceability, parameters, join safety, KPI correctness, validation queries, and performance notes."
+  },
+  "04-dashboard-report-development": {
+    userAction: "Plan or document the dashboard/report build in Grafana, FlexReport, or Superset.",
+    uploads: "SQL outputs, wireframes, screenshots, dashboard exports, branding rules, or platform notes.",
+    output: "Page/section plan, visual inventory, dataset inventory, filter inventory, and build issues.",
+    gateFocus: "Each required KPI/output has a component, dataset, filters, access expectations, and build evidence."
+  },
+  "05-ai-review-validation": {
+    userAction: "Review requirement coverage, SQL logic, UX/report behavior, governance, and open issues.",
+    uploads: "Screenshots, exports, SQL draft, build notes, review comments, or comparison reports.",
+    output: "Review summary, coverage matrix, severity-based findings, and correction plan.",
+    gateFocus: "Critical and high findings must be fixed or formally accepted before testing."
+  },
+  "06-testing-verification": {
+    userAction: "Execute test cases and record evidence against acceptance criteria.",
+    uploads: "Query results, screenshots, exports, test evidence, expected values, or stakeholder samples.",
+    output: "Test log, defect log, known limitations, retest status, and release recommendation.",
+    gateFocus: "Every acceptance criterion has evidence, and critical/high defects are resolved or accepted."
+  },
+  "07-approval-delivery": {
+    userAction: "Package final delivery, sign-off, deployment notes, rollback path, and support handoff.",
+    uploads: "Final links, release notes, sign-off emails, deployment evidence, or support documents.",
+    output: "Delivery summary, deployment record, sign-off record, support handoff, and post-delivery actions.",
+    gateFocus: "No delivery closure without sign-off, ownership, known limitations, rollback notes, and monitoring."
+  }
+};
 
 export default function App() {
   const [phaseDefs, setPhaseDefs] = useState<PhaseDefinition[]>([]);
@@ -66,9 +112,6 @@ export default function App() {
       ]);
       setPhaseDefs(phases);
       setProjects(loadedProjects);
-      if (loadedProjects[0]) {
-        setSelectedProjectId(loadedProjects[0].projectId);
-      }
     } catch (error) {
       showError(error);
     }
@@ -197,6 +240,7 @@ export default function App() {
             <span>New Project</span>
           </div>
           <input
+            aria-label="Project name"
             value={createForm.projectName}
             onChange={(event) =>
               setCreateForm((current) => ({
@@ -208,16 +252,19 @@ export default function App() {
             placeholder="Project name"
           />
           <input
+            aria-label="Project ID"
             value={createForm.projectId}
             onChange={(event) => setCreateForm((current) => ({ ...current, projectId: slugify(event.target.value) }))}
             placeholder="project-id"
           />
           <input
+            aria-label="Owner"
             value={createForm.owner}
             onChange={(event) => setCreateForm((current) => ({ ...current, owner: event.target.value }))}
             placeholder="Owner"
           />
           <select
+            aria-label="Target platform"
             value={createForm.targetPlatform}
             onChange={(event) => setCreateForm((current) => ({ ...current, targetPlatform: event.target.value }))}
           >
@@ -306,6 +353,8 @@ export default function App() {
 
             <section className="phase-workbench">
               <PhaseHeader phase={activePhase} project={project} />
+              <PhaseGuide phase={activePhase} />
+              <GateSummary phase={activePhase} />
 
               <div className="workbench-actions">
                 <UploadButton onUpload={uploadFiles} disabled={busy} />
@@ -313,7 +362,12 @@ export default function App() {
                   {busy ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
                   Run Agent
                 </button>
-                <button className="primary-btn" onClick={completePhase} disabled={busy}>
+                <button
+                  className="primary-btn"
+                  onClick={completePhase}
+                  disabled={busy || countGateBlockers(activePhase) > 0}
+                  title={countGateBlockers(activePhase) > 0 ? "Resolve all incomplete or blocked gate items first" : "Complete this phase"}
+                >
                   <CheckCircle2 size={16} />
                   Complete Phase
                 </button>
@@ -328,8 +382,6 @@ export default function App() {
 
               <ArtifactStrip phase={activePhase} />
 
-              <GateEditor phase={activePhase} onSave={saveGate} disabled={busy} />
-
               <section className="output-panel" id="agent-output">
                 <div className="section-title">
                   <FileText size={16} />
@@ -337,6 +389,8 @@ export default function App() {
                 </div>
                 <pre>{activePhase.outputText || "No output yet."}</pre>
               </section>
+
+              <GateEditor phase={activePhase} onSave={saveGate} disabled={busy} />
             </section>
           </div>
         ) : (
@@ -365,6 +419,77 @@ function PhaseHeader({ phase, project }: { phase: Phase; project: ProjectDetail 
         <small>{project.owner || "Owner TBD"}</small>
       </div>
     </section>
+  );
+}
+
+function PhaseGuide({ phase }: { phase: Phase }) {
+  const guidance = phaseGuidance[phase.id];
+  return (
+    <section className="phase-guide">
+      <div className="guide-card">
+        <Play size={16} />
+        <div>
+          <strong>Work to do</strong>
+          <p>{guidance.userAction}</p>
+        </div>
+      </div>
+      <div className="guide-card">
+        <Upload size={16} />
+        <div>
+          <strong>Useful uploads</strong>
+          <p>{guidance.uploads}</p>
+        </div>
+      </div>
+      <div className="guide-card">
+        <FileText size={16} />
+        <div>
+          <strong>Expected output</strong>
+          <p>{guidance.output}</p>
+        </div>
+      </div>
+      <div className="guide-card">
+        <ShieldCheck size={16} />
+        <div>
+          <strong>Gate focus</strong>
+          <p>{guidance.gateFocus}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function GateSummary({ phase }: { phase: Phase }) {
+  const allRows = [...phase.gate.projectContext, ...phase.gate.entry, ...phase.gate.exit];
+  const counts = allRows.reduce(
+    (acc, row) => {
+      acc[row.status] = (acc[row.status] || 0) + 1;
+      return acc;
+    },
+    { Complete: 0, Incomplete: 0, Blocked: 0, "Not applicable": 0 } as Record<string, number>
+  );
+  const blockers = countGateBlockers(phase);
+  return (
+    <section className="gate-summary">
+      <div>
+        <span className="eyebrow">Gate readiness</span>
+        <h4>{blockers === 0 ? "Ready for phase completion review" : `${blockers} gate item(s) still blocking`}</h4>
+      </div>
+      <div className="gate-metrics">
+        <Metric label="Complete" value={counts.Complete} tone="good" />
+        <Metric label="Incomplete" value={counts.Incomplete} tone="warn" />
+        <Metric label="Blocked" value={counts.Blocked} tone="bad" />
+        <Metric label="N/A" value={counts["Not applicable"]} tone="neutral" />
+      </div>
+    </section>
+  );
+}
+
+function Metric({ label, value, tone }: { label: string; value: number; tone: "good" | "warn" | "bad" | "neutral" }) {
+  return (
+    <div className={`metric ${tone}`}>
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
   );
 }
 
@@ -432,32 +557,37 @@ function GateTable({
   onChange: (index: number, patch: Partial<GateRow>) => void;
 }) {
   return (
-    <div className="gate-table-block">
+    <div className="gate-section">
       <h4>{title}</h4>
-      <div className="gate-table">
-        <div className="gate-table-head">
-          <span>Item</span>
-          <span>Status</span>
-          <span>Evidence</span>
-          <span>Owner</span>
-          <span>Notes</span>
-        </div>
+      <div className="gate-card-list">
         {rows.map((row, index) => (
-          <div className="gate-table-row" key={`${title}-${row.item}`}>
-            <div>
+          <div className={`gate-card ${statusClass(row.status)}`} key={`${title}-${row.item}`}>
+            <div className="gate-card-main">
               <strong>{row.item}</strong>
               <small>{row.requiredCondition}</small>
             </div>
-            <select value={row.status} onChange={(event) => onChange(index, { status: event.target.value as GateRow["status"] })}>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-            <input value={row.evidence} onChange={(event) => onChange(index, { evidence: event.target.value })} />
-            <input value={row.owner} onChange={(event) => onChange(index, { owner: event.target.value })} />
-            <input value={row.notes} onChange={(event) => onChange(index, { notes: event.target.value })} />
+            <label>
+              <span>Status</span>
+              <select value={row.status} onChange={(event) => onChange(index, { status: event.target.value as GateRow["status"] })}>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Evidence</span>
+              <input value={row.evidence} onChange={(event) => onChange(index, { evidence: event.target.value })} />
+            </label>
+            <label>
+              <span>Owner</span>
+              <input value={row.owner} onChange={(event) => onChange(index, { owner: event.target.value })} />
+            </label>
+            <label>
+              <span>Notes</span>
+              <input value={row.notes} onChange={(event) => onChange(index, { notes: event.target.value })} />
+            </label>
           </div>
         ))}
       </div>
@@ -485,15 +615,21 @@ function UploadButton({ onUpload, disabled }: { onUpload: (files: FileList | nul
 }
 
 function GateDot({ phase }: { phase: Phase }) {
-  const blockers = [
-    ...phase.gate.projectContext,
-    ...phase.gate.entry,
-    ...phase.gate.exit
-  ].filter((row) => row.status === "Incomplete" || row.status === "Blocked").length;
+  const blockers = countGateBlockers(phase);
 
   if (phase.state.status === "completed") return <CheckCircle2 className="gate-dot complete" size={18} />;
   if (blockers > 0) return <AlertTriangle className="gate-dot blocked" size={18} />;
   return <Circle className="gate-dot ready" size={18} />;
+}
+
+function countGateBlockers(phase: Phase) {
+  return [...phase.gate.projectContext, ...phase.gate.entry, ...phase.gate.exit].filter(
+    (row) => row.status === "Incomplete" || row.status === "Blocked" || (row.status === "Not applicable" && !row.notes && !row.evidence)
+  ).length;
+}
+
+function statusClass(status: GateRow["status"]) {
+  return status.toLowerCase().replace(/\s+/g, "-");
 }
 
 function StatusPill({ status }: { status: string }) {

@@ -27,6 +27,8 @@ temp/
 node_modules/
 dist/
 *.tsbuildinfo
+test-results/
+playwright-report/
 
 # Local secrets/config
 .env

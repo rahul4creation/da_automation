@@ -277,7 +277,7 @@ app.post("/api/projects", async (req, res, next) => {
 
     await createProjectWorkspace({ projectId, projectName, owner, targetPlatform });
     const state = await readProjectState(projectId);
-    res.status(201).json({ project: state });
+    res.status(201).json({ project: await buildProjectDetail(state) });
   } catch (error) {
     next(error);
   }
