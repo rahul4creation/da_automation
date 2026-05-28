@@ -71,7 +71,7 @@ const PHASES = [
 
 const GATES = {
   projectContext: [
-    ["Project ID", "Stable project_id is known and uses lowercase letters, digits, and hyphens."],
+    ["Project ID", "Stable project_id is known and uses lowercase letters, digits, hyphens, and underscores."],
     ["Project workspace", "Project artifact root exists or will be created under projects/<project_id>/."],
     ["Project control file", "PROJECT.md exists or will be created for the project."],
     ["Current phase", "Active phase is known."],
@@ -445,8 +445,8 @@ function assertInside(baseDir, targetPath) {
 
 function assertProjectId(value) {
   const projectId = String(value || "").trim();
-  if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(projectId)) {
-    const error = new Error("Invalid project_id. Use lowercase letters, digits, and hyphens.");
+  if (!/^[a-z0-9][a-z0-9_-]{1,62}$/.test(projectId)) {
+    const error = new Error("Invalid project_id. Use lowercase letters, digits, hyphens, and underscores.");
     error.statusCode = 400;
     throw error;
   }
@@ -470,8 +470,8 @@ function safeFilename(filename) {
 function slugify(value) {
   return String(value || "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
     .slice(0, 63);
 }
 

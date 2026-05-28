@@ -5,8 +5,8 @@ Use this reference whenever a user may work on more than one reporting/dashboard
 ## Project Identity Rules
 
 - Every project must have a stable `project_id`.
-- Use lowercase letters, digits, and hyphens only.
-- Prefer short IDs such as `sales-kpi-dashboard`, `finance-aging-report`, or `ops-sla-grafana`.
+- Use lowercase letters, digits, hyphens, and underscores only.
+- Prefer short IDs such as `sales-kpi-dashboard`, `finance-aging-report`, `ops-sla-grafana`, or `sample_project`.
 - Do not mix artifacts from different projects.
 - When the user mentions a project name but not an ID, derive a safe ID and confirm it when the context is ambiguous.
 

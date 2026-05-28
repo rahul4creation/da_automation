@@ -9,8 +9,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if ($ProjectId -notmatch "^[a-z0-9][a-z0-9-]{1,62}$") {
-    throw "ProjectId must use lowercase letters, digits, and hyphens only, and must start with a letter or digit."
+if ($ProjectId -notmatch "^[a-z0-9][a-z0-9_-]{1,62}$") {
+    throw "ProjectId must use lowercase letters, digits, hyphens, and underscores only, and must start with a letter or digit."
 }
 
 $repoRoot = git rev-parse --show-toplevel 2>$null

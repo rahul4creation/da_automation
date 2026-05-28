@@ -33,11 +33,11 @@ test("project phase workflow smoke", async ({ page }) => {
   await expect(page.getByText("DA Workflow")).toBeVisible();
   await expect(page.getByText("New Project")).toBeVisible();
 
-  const projectId = `ux-smoke-${Date.now()}`;
+  const projectId = `ux_smoke_${Date.now()}`;
   createdProjects.push(projectId);
 
   await page.getByPlaceholder("Project name").fill("UX Smoke Project");
-  await page.getByPlaceholder("project-id").fill(projectId);
+  await page.getByPlaceholder("project-id or project_id").fill(projectId);
   await page.getByPlaceholder("Owner").fill("QA");
   await page.locator("select").first().selectOption("Grafana");
   await page.getByRole("button", { name: "Create" }).click();

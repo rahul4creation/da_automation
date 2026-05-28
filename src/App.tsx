@@ -568,7 +568,7 @@ export default function App() {
             aria-label="Project ID"
             value={createForm.projectId}
             onChange={(event) => setCreateForm((current) => ({ ...current, projectId: slugify(event.target.value) }))}
-            placeholder="project-id"
+            placeholder="project-id or project_id"
           />
           <input
             aria-label="Owner"
@@ -1245,8 +1245,8 @@ function StatusPill({ status }: { status: string }) {
 function slugify(value: string) {
   return value
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
     .slice(0, 63);
 }
 

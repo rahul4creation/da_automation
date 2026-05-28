@@ -28,7 +28,7 @@ Complete this gate before any phase begins. It applies to every phase and every 
 
 | Item | Required condition |
 | --- | --- |
-| Project ID | Stable `project_id` is known and uses lowercase letters, digits, and hyphens. |
+| Project ID | Stable `project_id` is known and uses lowercase letters, digits, hyphens, and underscores. |
 | Project workspace | Project artifact root exists or will be created under `projects/<project_id>/`. |
 | Project control file | `PROJECT.md` exists or will be created for the project. |
 | Current phase | Active phase is known. |
