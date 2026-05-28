@@ -22,6 +22,11 @@ env/
 tmp/
 temp/
 
+# Node/Vite app
+node_modules/
+dist/
+*.tsbuildinfo
+
 # Local secrets/config
 .env
 .env.*
@@ -31,3 +36,4 @@ temp/
 projects/*/data/
 projects/*/exports/
 projects/*/evidence/raw/
+projects/*/phases/*/uploads/
