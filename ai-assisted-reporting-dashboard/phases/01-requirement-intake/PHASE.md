@@ -95,6 +95,7 @@ Produce:
 - Scope decision list
 - Acceptance criteria
 - Phase handoff note
+- Entry and exit gate status from `references/phase-gates.md`
 
 Use this structure for the phase answer:
 
@@ -131,6 +132,8 @@ Use this structure for the phase answer:
 
 ## Quality Gate
 
+Before handoff, complete the Phase 1 gate in `references/phase-gates.md`.
+
 The phase is complete only when these are true:
 
 - Business objective is explicit.
@@ -140,6 +143,8 @@ The phase is complete only when these are true:
 - Grain, filters, time window, and refresh expectations are known or explicitly questioned.
 - Security and delivery expectations are captured.
 - Acceptance criteria are testable.
+
+Do not move to Phase 2 while any Phase 1 exit gate item is `Incomplete` or `Blocked`. If leadership asks to proceed anyway, record the item as an accepted risk with owner, impact, and follow-up.
 
 ## Common Failure Modes
 

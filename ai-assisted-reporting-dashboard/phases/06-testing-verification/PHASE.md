@@ -113,6 +113,8 @@ Use this structure:
 
 ## Quality Gate
 
+Before handoff, complete the Phase 6 gate in `references/phase-gates.md`.
+
 The phase is complete only when these are true:
 
 - Every acceptance criterion has a test result.
@@ -121,6 +123,8 @@ The phase is complete only when these are true:
 - Access and export behavior are verified when required.
 - Retest status is recorded for fixes.
 - Final recommendation is clear.
+
+Do not move to Phase 7 while any Phase 6 exit gate item is `Incomplete` or `Blocked`. Missing evidence, untested acceptance criteria, or unresolved critical/high defects block approval and delivery.
 
 ## Common Failure Modes
 

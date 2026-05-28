@@ -129,6 +129,8 @@ Produce:
 
 ## Quality Gate
 
+Before handoff, complete the Phase 5 gate in `references/phase-gates.md`.
+
 The phase is complete only when these are true:
 
 - Requirement coverage is documented.
@@ -136,6 +138,8 @@ The phase is complete only when these are true:
 - Critical and high findings have owners or are explicitly accepted as risks.
 - Review recommendations are concrete.
 - Testing focus areas are identified.
+
+Do not move to Phase 6 while any Phase 5 exit gate item is `Incomplete` or `Blocked`. Critical or high findings must be fixed or formally accepted before testing is treated as release verification.
 
 ## Common Failure Modes
 

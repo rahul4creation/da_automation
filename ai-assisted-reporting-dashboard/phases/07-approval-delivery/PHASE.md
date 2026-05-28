@@ -134,6 +134,8 @@ Recommend monitoring for:
 
 ## Quality Gate
 
+Before closure, complete the Phase 7 gate in `references/phase-gates.md`.
+
 The phase is complete only when these are true:
 
 - Business and technical sign-off are documented.
@@ -142,6 +144,8 @@ The phase is complete only when these are true:
 - Known limitations and accepted risks have owners.
 - Rollback or correction approach is documented.
 - Post-delivery monitoring actions are assigned.
+
+Do not mark the work delivered while any Phase 7 exit gate item is `Incomplete` or `Blocked`. A release without sign-off, support ownership, rollback notes, or accepted-risk ownership remains open.
 
 ## Common Failure Modes
 

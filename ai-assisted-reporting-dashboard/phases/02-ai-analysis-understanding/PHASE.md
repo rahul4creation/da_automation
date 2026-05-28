@@ -121,6 +121,8 @@ When database access or schema details are available, prefer these investigation
 
 ## Quality Gate
 
+Before handoff, complete the Phase 2 gate in `references/phase-gates.md`.
+
 The phase is complete only when these are true:
 
 - Each requirement is mapped, questioned, or rejected as unavailable.
@@ -130,6 +132,8 @@ The phase is complete only when these are true:
 - Date basis and refresh implications are documented.
 - Data quality checks are proposed.
 - Blocking questions are clearly assigned.
+
+Do not move to Phase 3 while any Phase 2 exit gate item is `Incomplete` or `Blocked`. If the team proceeds with unresolved data assumptions, document each assumption as an accepted risk with owner, impact, and validation action.
 
 ## Common Failure Modes
 

@@ -185,6 +185,8 @@ Produce:
 
 ## Quality Gate
 
+Before handoff, complete the Phase 3 gate in `references/phase-gates.md`.
+
 The phase is complete only when these are true:
 
 - SQL covers every mapped requirement or explicitly excludes unresolved items.
@@ -193,6 +195,8 @@ The phase is complete only when these are true:
 - Validation queries are included.
 - KPI formulas are traceable to the requirement brief.
 - Review risks and assumptions are listed.
+
+Do not move to Phase 4 while any Phase 3 exit gate item is `Incomplete` or `Blocked`. SQL without validation queries, traceability, or documented assumptions is not ready for dashboard/report development.
 
 ## Common Failure Modes
 

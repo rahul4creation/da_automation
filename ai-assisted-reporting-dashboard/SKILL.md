@@ -29,7 +29,19 @@ Start with the earliest incomplete phase unless the user asks for a specific pha
 6. Testing and Verification: `phases/06-testing-verification/PHASE.md`
 7. Approval and Delivery: `phases/07-approval-delivery/PHASE.md`
 
-Each phase directory acts as a detailed phase skill. Load the phase file for the current task, then use `references/artifacts.md` when you need standard output templates for briefs, mappings, SQL notes, build notes, review logs, test logs, or delivery summaries.
+Each phase directory acts as a detailed phase skill. Load the phase file for the current task, then use `references/artifacts.md` when you need standard output templates for briefs, mappings, SQL notes, build notes, review logs, test logs, or delivery summaries. Use `references/phase-gates.md` before moving between phases.
+
+## Gate Policy
+
+Every phase transition is controlled by an entry gate and an exit gate. Do not move to the next phase until the current phase exit gate is complete and the next phase entry gate is satisfied.
+
+- Mark each gate item as `Complete`, `Incomplete`, `Blocked`, or `Not applicable`.
+- Treat `Incomplete` and `Blocked` as no-go states.
+- Use `Not applicable` only with a reason.
+- Record evidence for every completed gate item.
+- Record an owner and next action for every incomplete or blocked item.
+- Keep human sign-off separate from AI recommendation; AI can recommend a phase pass, but the responsible human owner approves business, access, deployment, and client decisions.
+- If a user asks to skip a gate, document the skipped item as an accepted risk with owner, reason, impact, and follow-up.
 
 ## Phase Selection
 
@@ -60,6 +72,8 @@ At the end of each phase, provide:
 - Completed artifact name and summary
 - Key assumptions and open questions
 - Risks or blockers
+- Entry gate status and exit gate status
+- Evidence for completed gate items
 - Recommended next phase
 - Items requiring human decision or sign-off
 

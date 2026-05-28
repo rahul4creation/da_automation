@@ -137,6 +137,8 @@ Use this structure:
 
 ## Quality Gate
 
+Before handoff, complete the Phase 4 gate in `references/phase-gates.md`.
+
 The phase is complete only when these are true:
 
 - The artifact structure supports the stated business workflow.
@@ -145,6 +147,8 @@ The phase is complete only when these are true:
 - Filter behavior is documented.
 - Platform-specific implementation notes are recorded.
 - Known limitations or open implementation issues are assigned.
+
+Do not move to Phase 5 while any Phase 4 exit gate item is `Incomplete` or `Blocked`. A dashboard/report without component inventory, filter behavior, access expectations, and build evidence is not review-ready.
 
 ## Common Failure Modes
 
