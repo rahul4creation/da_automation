@@ -5,13 +5,17 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
 const PROJECTS_ROOT = path.join(ROOT, "projects");
 const SKILL_ROOT = path.join(ROOT, "ai-assisted-reporting-dashboard");
+const EXCEL_PREVIEW_SCRIPT = path.join(ROOT, "scripts", "excel-preview.py");
 const PORT = Number(process.env.PORT || 8787);
+const execFileAsync = promisify(execFile);
 
 const PHASES = [
   {
@@ -832,8 +836,11 @@ async function summarizeUploads(projectId, phaseId) {
     const filePath = phasePath(projectId, phaseId, "uploads", file.storedName);
     const ext = path.extname(file.originalName).toLowerCase();
     const textExts = new Set([".txt", ".md", ".csv", ".sql", ".json", ".yaml", ".yml", ".log"]);
+    const excelExts = new Set([".xlsx", ".xlsm", ".xltx", ".xltm"]);
     let preview = "";
-    if (textExts.has(ext)) {
+    if (excelExts.has(ext)) {
+      preview = await previewExcelWorkbook(filePath);
+    } else if (textExts.has(ext)) {
       preview = (await readText(filePath)).slice(0, 5000);
     } else {
       preview = `Binary artifact recorded (${file.mimetype || "unknown type"}). Review content manually or provide extracted text.`;
@@ -841,6 +848,19 @@ async function summarizeUploads(projectId, phaseId) {
     summaries.push({ ...file, preview });
   }
   return summaries;
+}
+
+async function previewExcelWorkbook(filePath) {
+  try {
+    const { stdout } = await execFileAsync("py", ["-3", EXCEL_PREVIEW_SCRIPT, filePath], {
+      timeout: 30000,
+      maxBuffer: 1024 * 1024
+    });
+    return stdout.trim().slice(0, 8000);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `Excel artifact uploaded, but preview extraction failed: ${message}`;
+  }
 }
 
 function buildAgentOutput({ state, phase, notes, uploads, gate, blockerCount }) {
@@ -851,6 +871,18 @@ function buildAgentOutput({ state, phase, notes, uploads, gate, blockerCount }) 
       : uploads
           .map((file) => `| ${escapePipes(file.originalName)} | ${file.size} bytes | ${escapePipes(file.preview.split("\n").slice(0, 3).join(" "))} |`)
           .join("\n");
+  const uploadDetails =
+    uploads.length === 0
+      ? "No uploaded artifacts."
+      : uploads
+          .map(
+            (file) => `### ${file.originalName}
+
+\`\`\`text
+${file.preview}
+\`\`\``
+          )
+          .join("\n\n");
   const gateSummary = summarizeGate(gate);
 
   return `# ${phase.outputTitle}
@@ -882,6 +914,10 @@ ${notes || "TBD"}
 | Artifact | Size | Agent-readable preview |
 | --- | ---: | --- |
 ${uploadRows}
+
+## Artifact Details
+
+${uploadDetails}
 
 ${phaseWorkProduct(phase.id)}
 

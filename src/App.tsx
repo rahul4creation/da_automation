@@ -210,8 +210,15 @@ export default function App() {
     try {
       setBusy(true);
       await apiPost(`/api/projects/${project.projectId}/phases/${activePhase.id}/uploads`, formData);
-      setToast({ type: "success", message: `${files.length} artifact(s) uploaded` });
+      setToast({ type: "info", message: `${files.length} artifact(s) uploaded. Running agent...` });
+      await apiPost(`/api/projects/${project.projectId}/phases/${activePhase.id}/run`, {
+        notes: notes || "Analyze newly uploaded artifact(s)."
+      });
+      setToast({ type: "success", message: `${files.length} artifact(s) uploaded and analyzed` });
       await loadProject(project.projectId);
+      window.requestAnimationFrame(() => {
+        document.getElementById("agent-output")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     } catch (error) {
       showError(error);
     } finally {

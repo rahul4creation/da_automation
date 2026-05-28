@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,9 +61,29 @@ test("project phase workflow smoke", async ({ page }) => {
   await page
     .getByPlaceholder("Add phase notes, stakeholder input, SQL comments, or instructions for this run")
     .fill("Need operational dashboard for request intake smoke test.");
-  await page.getByRole("button", { name: "Run Agent" }).click();
 
-  await expect(page.getByText("Agent output generated")).toBeVisible({ timeout: 15000 });
+  const fixtureDir = path.join(repoRoot, "tmp", "ui-test-fixtures");
+  await fs.mkdir(fixtureDir, { recursive: true });
+  const workbookPath = path.join(fixtureDir, "dashboard-requirements.xlsx");
+  execFileSync("py", [
+    "-3",
+    "-c",
+    [
+      "from openpyxl import Workbook",
+      "wb = Workbook()",
+      "ws = wb.active",
+      "ws.title = 'Requirements'",
+      "ws.append(['Dashboard Name', 'KPI', 'Filter'])",
+      "ws.append(['Smoke Dashboard', 'Availability', 'Date Range'])",
+      `wb.save(r'${workbookPath.replace(/'/g, "''")}')`
+    ].join(";")
+  ]);
+
+  await page.locator('input[type="file"]').setInputFiles(workbookPath);
+
+  await expect(page.getByText("uploaded and analyzed")).toBeVisible({ timeout: 20000 });
   await expect(page.getByText("Agent Output", { exact: true })).toBeVisible();
+  await expect(page.getByText("Excel workbook")).toBeVisible();
+  await expect(page.getByText("Smoke Dashboard")).toBeVisible();
   await expect(page.getByText("Gate blockers remaining")).toBeVisible();
 });
