@@ -93,6 +93,13 @@ export async function apiPut<T>(url: string, body?: unknown): Promise<T> {
   return parseResponse<T>(response);
 }
 
+export async function apiDelete<T>(url: string): Promise<T> {
+  const response = await fetch(`${API_BASE}${url}`, {
+    method: "DELETE"
+  });
+  return parseResponse<T>(response);
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {

@@ -155,6 +155,13 @@ button {
   text-align: left;
 }
 
+.project-row-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  gap: 6px;
+  align-items: stretch;
+}
+
 .project-row {
   display: grid;
   gap: 3px;
@@ -496,6 +503,18 @@ button {
   background: #ffffff;
   border-color: #c6d0db;
   color: #24364b;
+}
+
+.danger-icon {
+  align-self: stretch;
+  width: 36px;
+  min-height: 100%;
+  color: #a33b2f;
+}
+
+.danger-icon:hover {
+  border-color: #e6a29b;
+  background: #fff3f1;
 }
 
 .primary-btn:disabled,

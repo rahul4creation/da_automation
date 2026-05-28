@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Save,
   ShieldCheck,
+  Trash2,
   Upload,
   XCircle
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   PhaseDefinition,
   ProjectDetail,
   ProjectSummary,
+  apiDelete,
   apiGet,
   apiPost,
   apiPut
@@ -213,6 +215,30 @@ export default function App() {
     }
   }
 
+  async function moveProjectToTrash(item: ProjectSummary) {
+    const confirmed = window.confirm(
+      `Move "${item.projectName}" to trash?\n\nThe project will be removed from the active list, but the files will stay under projects/_trash.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setBusy(true);
+      const result = await apiDelete<{ trashPath: string }>(`/api/projects/${item.projectId}`);
+      if (selectedProjectId === item.projectId) {
+        setSelectedProjectId("");
+        setProject(null);
+        setActivePhaseId("");
+        setNotes("");
+      }
+      await refreshProjects();
+      setToast({ type: "success", message: `${item.projectName} moved to trash: ${result.trashPath}` });
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function uploadFiles(files: FileList | null) {
     if (!project || !activePhase || !files?.length) return;
     const formData = new FormData();
@@ -305,17 +331,27 @@ export default function App() {
         </div>
         <div className="project-list">
           {projects.map((item) => (
-            <button
-              key={item.projectId}
-              className={`project-row ${item.projectId === selectedProjectId ? "active" : ""}`}
-              onClick={() => {
-                setSelectedProjectId(item.projectId);
-                setActivePhaseId("");
-              }}
-            >
-              <span>{item.projectName}</span>
-              <small>{item.projectId}</small>
-            </button>
+            <div className="project-row-shell" key={item.projectId}>
+              <button
+                className={`project-row ${item.projectId === selectedProjectId ? "active" : ""}`}
+                onClick={() => {
+                  setSelectedProjectId(item.projectId);
+                  setActivePhaseId("");
+                }}
+              >
+                <span>{item.projectName}</span>
+                <small>{item.projectId}</small>
+              </button>
+              <button
+                className="icon-btn danger-icon"
+                onClick={() => void moveProjectToTrash(item)}
+                disabled={busy}
+                title={`Move ${item.projectName} to trash`}
+                aria-label={`Move ${item.projectName} to trash`}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
           ))}
           {projects.length === 0 && <div className="empty-note">No projects yet</div>}
         </div>

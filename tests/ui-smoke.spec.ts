@@ -14,6 +14,17 @@ test.afterAll(async () => {
       throw new Error(`Refusing to remove unexpected path: ${projectPath}`);
     }
     await fs.rm(projectPath, { recursive: true, force: true });
+
+    const trashRoot = path.join(repoRoot, "projects", "_trash");
+    const trashEntries = await fs.readdir(trashRoot, { withFileTypes: true }).catch(() => []);
+    for (const entry of trashEntries) {
+      if (!entry.isDirectory() || !entry.name.startsWith(`${projectId}-`)) continue;
+      const trashPath = path.join(trashRoot, entry.name);
+      if (!trashPath.startsWith(trashRoot)) {
+        throw new Error(`Refusing to remove unexpected trash path: ${trashPath}`);
+      }
+      await fs.rm(trashPath, { recursive: true, force: true });
+    }
   }
 });
 
@@ -88,4 +99,13 @@ test("project phase workflow smoke", async ({ page }) => {
   await expect(page.getByText("Excel workbook")).toBeVisible();
   await expect(page.getByText("Smoke Dashboard")).toBeVisible();
   await expect(page.getByText("Gate blockers remaining")).toBeVisible();
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Move");
+    await dialog.accept();
+  });
+  await page.getByRole("button", { name: "Move UX Smoke Project to trash" }).click();
+  await expect(page.getByText("moved to trash")).toBeVisible();
+  await expect(page.getByText("No active project")).toBeVisible();
+  await expect(page.locator(".project-row", { hasText: projectId })).toHaveCount(0);
 });

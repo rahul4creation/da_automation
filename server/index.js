@@ -298,6 +298,16 @@ app.get("/api/projects/:projectId", async (req, res, next) => {
   }
 });
 
+app.delete("/api/projects/:projectId", async (req, res, next) => {
+  try {
+    const projectId = assertProjectId(req.params.projectId);
+    const result = await moveProjectToTrash(projectId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/projects/:projectId/phases/:phaseId", async (req, res, next) => {
   try {
     const projectId = assertProjectId(req.params.projectId);
@@ -406,6 +416,18 @@ function projectPath(projectId, ...parts) {
   return path.join(PROJECTS_ROOT, projectId, ...parts);
 }
 
+function assertInside(baseDir, targetPath) {
+  const base = path.resolve(baseDir);
+  const target = path.resolve(targetPath);
+  const baseWithSeparator = base.endsWith(path.sep) ? base : `${base}${path.sep}`;
+  if (!target.toLowerCase().startsWith(baseWithSeparator.toLowerCase())) {
+    const error = new Error("Refusing to operate outside the project workspace.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return target;
+}
+
 function assertProjectId(value) {
   const projectId = String(value || "").trim();
   if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(projectId)) {
@@ -470,6 +492,40 @@ async function writeJson(filePath, value) {
 async function writeText(filePath, value) {
   await ensureDir(path.dirname(filePath));
   await fsp.writeFile(filePath, value, "utf8");
+}
+
+async function moveProjectToTrash(projectId) {
+  const source = assertInside(PROJECTS_ROOT, projectPath(projectId));
+  const trashRoot = assertInside(PROJECTS_ROOT, path.join(PROJECTS_ROOT, "_trash"));
+  const state = await readProjectState(projectId);
+  await ensureDir(trashRoot);
+
+  let target = "";
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = attempt === 0 ? "" : `-${attempt}`;
+    target = assertInside(trashRoot, path.join(trashRoot, `${projectId}-${timestamp()}${suffix}`));
+    if (!fs.existsSync(target)) break;
+  }
+  if (!target || fs.existsSync(target)) {
+    const error = new Error("Could not create a unique trash location for this project.");
+    error.statusCode = 500;
+    throw error;
+  }
+
+  await fsp.rename(source, target);
+  await writeJson(path.join(target, "trash-metadata.json"), {
+    projectId,
+    projectName: state.projectName,
+    movedToTrashAt: new Date().toISOString(),
+    originalPath: `projects/${projectId}`,
+    trashPath: path.relative(ROOT, target).replace(/\\/g, "/")
+  });
+
+  return {
+    projectId,
+    trashed: true,
+    trashPath: path.relative(ROOT, target).replace(/\\/g, "/")
+  };
 }
 
 async function createProjectWorkspace({ projectId, projectName, owner, targetPlatform }) {
