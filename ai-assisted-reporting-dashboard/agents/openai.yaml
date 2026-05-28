@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Assisted Reporting Dashboard"
+  short_description: "AI workflow for reporting and dashboards"
+  default_prompt: "Use $ai-assisted-reporting-dashboard to guide a reporting or dashboard development request from intake through delivery."
