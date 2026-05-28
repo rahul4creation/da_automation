@@ -26,3 +26,8 @@ temp/
 .env
 .env.*
 !.env.example
+
+# Project workspaces: keep documentation, avoid raw/sensitive data by default
+projects/*/data/
+projects/*/exports/
+projects/*/evidence/raw/

@@ -22,15 +22,37 @@ For every incomplete or blocked item, capture:
 - Target date or decision point when known
 - Whether the next phase is blocked
 
+## Project Context Gate
+
+Complete this gate before any phase begins. It applies to every phase and every artifact.
+
+| Item | Required condition |
+| --- | --- |
+| Project ID | Stable `project_id` is known and uses lowercase letters, digits, and hyphens. |
+| Project workspace | Project artifact root exists or will be created under `projects/<project_id>/`. |
+| Project control file | `PROJECT.md` exists or will be created for the project. |
+| Current phase | Active phase is known. |
+| Artifact path | Output location for the current artifact is known. |
+| Project owner | Business owner, requester, or proxy owner is known. |
+| Cross-project scope | If multiple projects are affected, each `project_id` is listed. |
+
 ## Gate Report Template
 
 ```markdown
 ## Phase Gate Status
 
+- Project ID:
+- Project name:
+- Project artifact root:
 - Current phase:
 - Recommended next phase:
 - Gate recommendation: Pass / No-go / Conditional pass with accepted risk
 - Human approval required from:
+
+## Project Context Gate
+
+| Item | Status | Evidence | Owner | Notes |
+| --- | --- | --- | --- | --- |
 
 ## Entry Gate
 
@@ -54,6 +76,7 @@ For every incomplete or blocked item, capture:
 
 | Item | Required condition |
 | --- | --- |
+| Project context ready | Project Context Gate is complete. |
 | Request received | Raw request, ticket, screenshot, email, meeting note, or user prompt exists. |
 | Request owner known | Business requester or proxy owner is identified. |
 | Intake scope known | New report, dashboard, enhancement, migration, audit, or defect is identified. |
@@ -81,6 +104,7 @@ For every incomplete or blocked item, capture:
 
 | Item | Required condition |
 | --- | --- |
+| Project context ready | Project Context Gate is complete for the same `project_id` as Phase 1. |
 | Requirement brief | Phase 1 requirement brief is available and approved or marked with accepted risks. |
 | KPI catalog | KPI definitions or unresolved KPI questions are available. |
 | Data access path | Schema, DDL, sample rows, data dictionary, existing SQL, or owner path is available. |
@@ -105,6 +129,7 @@ For every incomplete or blocked item, capture:
 
 | Item | Required condition |
 | --- | --- |
+| Project context ready | Project Context Gate is complete for the same `project_id` as Phase 2. |
 | Mapping ready | Phase 2 mapping is complete or unresolved items have accepted risks. |
 | Schema available | Required table and column structure is available. |
 | KPI rules available | KPI formulas, filters, grain, and date logic are documented. |
@@ -129,6 +154,7 @@ For every incomplete or blocked item, capture:
 
 | Item | Required condition |
 | --- | --- |
+| Project context ready | Project Context Gate is complete for the same `project_id` as Phase 3. |
 | SQL ready | SQL draft and validation notes are available. |
 | Platform chosen | Grafana, FlexReport, or Superset target is selected. |
 | Requirements ready | Requirement brief and acceptance criteria are available. |
@@ -154,6 +180,7 @@ For every incomplete or blocked item, capture:
 
 | Item | Required condition |
 | --- | --- |
+| Project context ready | Project Context Gate is complete for the same `project_id` as Phase 4. |
 | Review artifacts | Requirement brief, mapping, SQL, build notes, and available screenshots/exports are available. |
 | Review scope | SQL, visual/report, filter, access, performance, and governance scope is defined. |
 | Acceptance criteria | Criteria from Phase 1 are available for coverage review. |
@@ -176,6 +203,7 @@ For every incomplete or blocked item, capture:
 
 | Item | Required condition |
 | --- | --- |
+| Project context ready | Project Context Gate is complete for the same `project_id` as Phase 5. |
 | Review completed | Phase 5 findings are resolved, assigned, or accepted. |
 | Testable artifact | Dashboard/report/query/export is available in a testable environment. |
 | Expected results | Trusted source, sample, prior report, or stakeholder expected values are available. |
@@ -201,6 +229,7 @@ For every incomplete or blocked item, capture:
 
 | Item | Required condition |
 | --- | --- |
+| Project context ready | Project Context Gate is complete for the same `project_id` as Phase 6. |
 | Testing complete | Phase 6 release recommendation is pass or pass with accepted risks. |
 | Delivery artifact ready | Final dashboard/report/query/export exists in the target environment or release package. |
 | Owners known | Business owner, technical owner, support owner, and approver are identified. |

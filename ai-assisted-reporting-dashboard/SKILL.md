@@ -1,6 +1,6 @@
 ---
 name: ai-assisted-reporting-dashboard
-description: AI-assisted workflow for Data Analysis reporting and dashboard development across PostgreSQL, Grafana, FlexReport, and Apache Superset. Use when Codex needs to support requirement intake, data understanding, SQL logic, dashboard or report build, review, testing, approval, delivery, governance, or project-wide validation for reporting and dashboard work.
+description: AI-assisted workflow for Data Analysis reporting and dashboard development across PostgreSQL, Grafana, FlexReport, and Apache Superset, with support for multiple concurrent projects. Use when Codex needs to support project setup, requirement intake, data understanding, SQL logic, dashboard or report build, review, testing, approval, delivery, governance, or project-wide validation for reporting and dashboard work.
 ---
 
 # AI-Assisted Reporting Dashboard
@@ -19,7 +19,9 @@ AI should handle repetitive analysis, draft logic, consistency checks, documenta
 
 ## Workflow
 
-Start with the earliest incomplete phase unless the user asks for a specific phase. Load the matching phase file before doing detailed work:
+Start by establishing project context. If the user is working across multiple projects, identify the target `project_id` before changing or producing artifacts. Use `references/project-workspaces.md` for multi-project setup and storage rules.
+
+After project context is known, start with the earliest incomplete phase unless the user asks for a specific phase. Load the matching phase file before doing detailed work:
 
 1. Requirement Intake: `phases/01-requirement-intake/PHASE.md`
 2. AI Analysis and Understanding: `phases/02-ai-analysis-understanding/PHASE.md`
@@ -30,6 +32,15 @@ Start with the earliest incomplete phase unless the user asks for a specific pha
 7. Approval and Delivery: `phases/07-approval-delivery/PHASE.md`
 
 Each phase directory acts as a detailed phase skill. Load the phase file for the current task, then use `references/artifacts.md` when you need standard output templates for briefs, mappings, SQL notes, build notes, review logs, test logs, or delivery summaries. Use `references/phase-gates.md` before moving between phases.
+
+## Multi-Project Policy
+
+- Require a `project_id` for every phase artifact, gate report, SQL draft, review, test, and delivery note.
+- Store project-specific outputs under `projects/<project_id>/` unless the user provides another location.
+- Keep each project's requirements, database notes, SQL, dashboard notes, evidence, approvals, and delivery records separate.
+- If the user does not provide a project, create or request a project context before phase work begins.
+- If a request touches multiple projects, handle it as portfolio/project-wide review and list each affected `project_id`.
+- Do not reuse assumptions, KPI definitions, database mappings, SQL, or sign-off from another project unless explicitly referenced and approved.
 
 ## Gate Policy
 
@@ -56,6 +67,7 @@ Every phase transition is controlled by an entry gate and an exit gate. Do not m
 ## Execution Rules
 
 - Produce concrete artifacts for the current phase, not generic advice.
+- Include `project_id`, project name, phase, artifact type, owner, and date in every substantial output.
 - Preserve traceability from business requirement to source data, SQL logic, visual, validation test, and delivery note.
 - Separate confirmed facts, assumptions, open questions, risks, and decisions.
 - Prefer explicit KPI formulas, grains, filters, time windows, joins, and ownership over shorthand.
@@ -69,6 +81,7 @@ Every phase transition is controlled by an entry gate and an exit gate. Do not m
 
 At the end of each phase, provide:
 
+- Project ID and project artifact path
 - Completed artifact name and summary
 - Key assumptions and open questions
 - Risks or blockers

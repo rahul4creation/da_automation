@@ -27,6 +27,7 @@ Package the verified dashboard or report for release, stakeholder sign-off, hand
 
 ## Required Inputs
 
+- Project ID and project workspace path.
 - Final dashboard/report name, link, export, or deployment location.
 - Test log and verification recommendation.
 - Review log and resolved issue summary.
@@ -134,6 +135,7 @@ Recommend monitoring for:
 
 ## Quality Gate
 
+Before starting, complete the Project Context Gate in `references/phase-gates.md`.
 Before closure, complete the Phase 7 gate in `references/phase-gates.md`.
 
 The phase is complete only when these are true:

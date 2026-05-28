@@ -28,6 +28,7 @@ Translate the approved requirement brief into a data understanding package. This
 
 ## Required Inputs
 
+- Project ID and project workspace path.
 - Requirement brief from Phase 1.
 - KPI catalog and acceptance criteria.
 - PostgreSQL schema details, table DDL, sample rows, data dictionary, or entity relationship notes.
@@ -121,6 +122,7 @@ When database access or schema details are available, prefer these investigation
 
 ## Quality Gate
 
+Before starting, complete the Project Context Gate in `references/phase-gates.md`.
 Before handoff, complete the Phase 2 gate in `references/phase-gates.md`.
 
 The phase is complete only when these are true:

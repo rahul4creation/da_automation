@@ -28,6 +28,7 @@ Create readable, reviewable PostgreSQL logic that turns mapped source data into 
 
 ## Required Inputs
 
+- Project ID and project workspace path.
 - Requirement brief and acceptance criteria.
 - Source-to-report mapping.
 - Table schemas, sample rows, existing SQL, or known query snippets.
@@ -185,6 +186,7 @@ Produce:
 
 ## Quality Gate
 
+Before starting, complete the Project Context Gate in `references/phase-gates.md`.
 Before handoff, complete the Phase 3 gate in `references/phase-gates.md`.
 
 The phase is complete only when these are true:

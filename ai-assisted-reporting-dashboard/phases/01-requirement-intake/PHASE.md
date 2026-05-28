@@ -28,6 +28,7 @@ Turn an unstructured business request into a complete, testable requirement brie
 
 ## Required Inputs
 
+- Project ID and project workspace path.
 - Business objective and decision supported by the report/dashboard.
 - Stakeholder names, user groups, and approvers.
 - Expected platform: Grafana, FlexReport, Apache Superset, or undecided.
@@ -132,6 +133,7 @@ Use this structure for the phase answer:
 
 ## Quality Gate
 
+Before starting, complete the Project Context Gate in `references/phase-gates.md`.
 Before handoff, complete the Phase 1 gate in `references/phase-gates.md`.
 
 The phase is complete only when these are true:

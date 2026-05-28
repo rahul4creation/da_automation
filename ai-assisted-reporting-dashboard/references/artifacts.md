@@ -17,10 +17,38 @@ Use these templates to keep phase outputs consistent. Fill unknown values with `
 - `Medium`: Important issue that should be fixed but may not block delivery.
 - `Low`: Minor cleanup, documentation, or enhancement.
 
+## Universal Artifact Header
+
+Put this header at the top of every substantial project artifact:
+
+```markdown
+- Project ID:
+- Project name:
+- Phase:
+- Artifact type:
+- Artifact path:
+- Version:
+- Owner:
+- Status: Draft / In review / Approved / Blocked / Delivered
+- Last updated:
+```
+
 ## Requirement Brief
 
 ```markdown
 # Requirement Brief
+
+## Artifact Header
+
+- Project ID:
+- Project name:
+- Phase: 01-requirement-intake
+- Artifact type: Requirement brief
+- Artifact path:
+- Version:
+- Owner:
+- Status:
+- Last updated:
 
 ## Request
 
@@ -96,6 +124,18 @@ Use these templates to keep phase outputs consistent. Fill unknown values with `
 ```markdown
 # Source-to-Report Mapping
 
+## Artifact Header
+
+- Project ID:
+- Project name:
+- Phase: 02-ai-analysis-understanding
+- Artifact type: Source-to-report mapping
+- Artifact path:
+- Version:
+- Owner:
+- Status:
+- Last updated:
+
 ## Summary
 
 - Reporting grain:
@@ -128,6 +168,18 @@ Use these templates to keep phase outputs consistent. Fill unknown values with `
 
 ```markdown
 # SQL Logic Notes
+
+## Artifact Header
+
+- Project ID:
+- Project name:
+- Phase: 03-sql-draft-logic-preparation
+- Artifact type: SQL logic notes
+- Artifact path:
+- Version:
+- Owner:
+- Status:
+- Last updated:
 
 ## Objective
 
@@ -169,6 +221,18 @@ Use these templates to keep phase outputs consistent. Fill unknown values with `
 ```markdown
 # Dashboard or Report Build Notes
 
+## Artifact Header
+
+- Project ID:
+- Project name:
+- Phase: 04-dashboard-report-development
+- Artifact type: Dashboard/report build notes
+- Artifact path:
+- Version:
+- Owner:
+- Status:
+- Last updated:
+
 ## Artifact
 
 - Name:
@@ -209,6 +273,18 @@ Use these templates to keep phase outputs consistent. Fill unknown values with `
 ```markdown
 # Review Log
 
+## Artifact Header
+
+- Project ID:
+- Project name:
+- Phase: 05-ai-review-validation
+- Artifact type: Review log
+- Artifact path:
+- Version:
+- Owner:
+- Status:
+- Last updated:
+
 ## Review Summary
 
 - Overall status: Pass / Pass with issues / Blocked
@@ -235,6 +311,18 @@ Use these templates to keep phase outputs consistent. Fill unknown values with `
 
 ```markdown
 # Test Log
+
+## Artifact Header
+
+- Project ID:
+- Project name:
+- Phase: 06-testing-verification
+- Artifact type: Test log
+- Artifact path:
+- Version:
+- Owner:
+- Status:
+- Last updated:
 
 ## Verification Summary
 
@@ -264,6 +352,18 @@ Use these templates to keep phase outputs consistent. Fill unknown values with `
 
 ```markdown
 # Delivery Summary
+
+## Artifact Header
+
+- Project ID:
+- Project name:
+- Phase: 07-approval-delivery
+- Artifact type: Delivery summary
+- Artifact path:
+- Version:
+- Owner:
+- Status:
+- Last updated:
 
 ## Artifact
 

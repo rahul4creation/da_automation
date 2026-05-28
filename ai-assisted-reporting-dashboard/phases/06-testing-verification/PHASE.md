@@ -28,6 +28,7 @@ Verify that the dashboard or report is accurate, usable, performant, secure, and
 
 ## Required Inputs
 
+- Project ID and project workspace path.
 - Reviewed SQL and final or near-final dashboard/report.
 - Requirement brief and acceptance criteria.
 - Review log and correction plan.
@@ -113,6 +114,7 @@ Use this structure:
 
 ## Quality Gate
 
+Before starting, complete the Project Context Gate in `references/phase-gates.md`.
 Before handoff, complete the Phase 6 gate in `references/phase-gates.md`.
 
 The phase is complete only when these are true:

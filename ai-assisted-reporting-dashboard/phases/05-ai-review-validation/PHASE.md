@@ -28,6 +28,7 @@ Perform a structured review before testing and delivery. This phase checks requi
 
 ## Required Inputs
 
+- Project ID and project workspace path.
 - Requirement brief and acceptance criteria.
 - Source-to-report mapping.
 - SQL draft and validation queries.
@@ -129,6 +130,7 @@ Produce:
 
 ## Quality Gate
 
+Before starting, complete the Project Context Gate in `references/phase-gates.md`.
 Before handoff, complete the Phase 5 gate in `references/phase-gates.md`.
 
 The phase is complete only when these are true:

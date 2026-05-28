@@ -28,6 +28,7 @@ Convert approved SQL logic and requirements into a usable dashboard or report in
 
 ## Required Inputs
 
+- Project ID and project workspace path.
 - Requirement brief and acceptance criteria.
 - Approved SQL draft or dataset definition.
 - Source-to-report mapping.
@@ -137,6 +138,7 @@ Use this structure:
 
 ## Quality Gate
 
+Before starting, complete the Project Context Gate in `references/phase-gates.md`.
 Before handoff, complete the Phase 4 gate in `references/phase-gates.md`.
 
 The phase is complete only when these are true:
