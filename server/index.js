@@ -344,12 +344,27 @@ app.put("/api/projects/:projectId/phases/:phaseId/gate", async (req, res, next) 
   }
 });
 
+app.put("/api/projects/:projectId/phases/:phaseId/questions", async (req, res, next) => {
+  try {
+    const projectId = assertProjectId(req.params.projectId);
+    const phaseId = assertPhaseId(req.params.phaseId);
+    const questionAnswers = normalizeQuestionAnswers(req.body.questionAnswers);
+    await writeQuestionAnswers(projectId, phaseId, questionAnswers);
+    res.json({ questionAnswers });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/projects/:projectId/phases/:phaseId/run", async (req, res, next) => {
   try {
     const projectId = assertProjectId(req.params.projectId);
     const phaseId = assertPhaseId(req.params.phaseId);
     const notes = String(req.body.notes || "").trim();
-    const result = await runLocalPhaseAgent(projectId, phaseId, notes);
+    const questionAnswers = Object.prototype.hasOwnProperty.call(req.body || {}, "questionAnswers")
+      ? normalizeQuestionAnswers(req.body.questionAnswers)
+      : null;
+    const result = await runLocalPhaseAgent(projectId, phaseId, notes, questionAnswers);
     res.json(result);
   } catch (error) {
     next(error);
@@ -709,6 +724,7 @@ async function buildPhaseDetail(state, phaseId) {
   const uploads = await readUploadManifest(state.projectId, phaseId);
   const gate = await readGateState(state.projectId, phaseId);
   const outputs = await listGeneratedOutputs(state.projectId, phaseId);
+  const questionAnswers = await readQuestionAnswers(state.projectId, phaseId);
 
   return {
     ...phase,
@@ -717,7 +733,8 @@ async function buildPhaseDetail(state, phaseId) {
     outputText,
     uploads,
     gate,
-    outputs
+    outputs,
+    questionAnswers
   };
 }
 
@@ -739,6 +756,23 @@ async function appendUploadManifest(projectId, phaseId, files) {
 
 async function readUploadManifest(projectId, phaseId) {
   return readJson(phasePath(projectId, phaseId, "uploads", "manifest.json"), []);
+}
+
+async function readQuestionAnswers(projectId, phaseId) {
+  return readJson(phasePath(projectId, phaseId, "question-answers.json"), {});
+}
+
+async function writeQuestionAnswers(projectId, phaseId, questionAnswers) {
+  await writeJson(phasePath(projectId, phaseId, "question-answers.json"), questionAnswers);
+}
+
+function normalizeQuestionAnswers(questionAnswers) {
+  if (!questionAnswers || typeof questionAnswers !== "object" || Array.isArray(questionAnswers)) return {};
+  return Object.fromEntries(
+    Object.entries(questionAnswers)
+      .map(([key, value]) => [slugify(key).replace(/-/g, "_"), String(value || "").trim().slice(0, 5000)])
+      .filter(([key]) => key)
+  );
 }
 
 function normalizeGatePayload(gate) {
@@ -840,13 +874,16 @@ async function listGeneratedOutputs(projectId, phaseId) {
   }
 }
 
-async function runLocalPhaseAgent(projectId, phaseId, notes) {
+async function runLocalPhaseAgent(projectId, phaseId, notes, incomingQuestionAnswers = null) {
   const state = await readProjectState(projectId);
   const phase = PHASES.find((item) => item.id === phaseId);
   const phaseDoc = await readText(path.join(SKILL_ROOT, "phases", phaseId, "PHASE.md"));
   const artifactTemplate = await readText(path.join(SKILL_ROOT, "references", "artifacts.md"));
   const gate = await readGateState(projectId, phaseId);
   const uploads = await summarizeUploads(projectId, phaseId);
+  const savedQuestionAnswers = await readQuestionAnswers(projectId, phaseId);
+  const questionAnswers = incomingQuestionAnswers ? { ...savedQuestionAnswers, ...incomingQuestionAnswers } : savedQuestionAnswers;
+  if (incomingQuestionAnswers) await writeQuestionAnswers(projectId, phaseId, questionAnswers);
   const existingArtifact = await readText(phasePath(projectId, phaseId, phase.artifactName));
   const blockerCount = findGateBlockers(gate).length;
   const output = buildAgentOutput({
@@ -856,6 +893,7 @@ async function runLocalPhaseAgent(projectId, phaseId, notes) {
     phaseDoc,
     artifactTemplate,
     uploads,
+    questionAnswers,
     gate,
     existingArtifact,
     blockerCount
@@ -919,14 +957,19 @@ async function previewExcelWorkbook(filePath) {
   }
 }
 
-function buildAgentOutput({ state, phase, notes, uploads, gate, blockerCount }) {
+function buildAgentOutput({ state, phase, notes, uploads, questionAnswers, gate, blockerCount }) {
   const now = new Date().toISOString();
+  const answeredQuestions = Object.entries(questionAnswers || {}).filter(([, value]) => String(value || "").trim());
   const uploadRows =
     uploads.length === 0
       ? "| None | No uploaded artifacts for this run. | |\n"
       : uploads
           .map((file) => `| ${escapePipes(file.originalName)} | ${file.size} bytes | ${escapePipes(file.preview.split("\n").slice(0, 3).join(" "))} |`)
           .join("\n");
+  const questionRows =
+    answeredQuestions.length === 0
+      ? "| None | No guided answers supplied. |\n"
+      : answeredQuestions.map(([key, value]) => `| ${humanizeQuestionKey(key)} | ${escapePipes(value)} |`).join("\n");
   const uploadDetails =
     uploads.length === 0
       ? "No uploaded artifacts."
@@ -959,7 +1002,14 @@ ${file.preview}
 - Gate recommendation: ${blockerCount === 0 ? "Ready for human review" : "No-go: gate blockers remain"}
 - Gate blockers remaining: ${blockerCount}
 - Notes supplied: ${notes ? "Yes" : "No"}
+- Guided questions answered: ${answeredQuestions.length}
 - Uploaded artifacts reviewed: ${uploads.length}
+
+## Guided Answers
+
+| Question | Answer |
+| --- | --- |
+${questionRows}
 
 ## User Notes
 
@@ -975,7 +1025,7 @@ ${uploadRows}
 
 ${uploadDetails}
 
-${phaseWorkProduct(phase.id)}
+${phaseWorkProduct(phase.id, questionAnswers)}
 
 ## Gate Status Summary
 
@@ -995,28 +1045,28 @@ This local runner structures the phase output and uses uploaded text artifacts w
 `;
 }
 
-function phaseWorkProduct(phaseId) {
+function phaseWorkProduct(phaseId, questionAnswers = {}) {
   if (phaseId === "01-requirement-intake") {
     return `## Requirement Brief Draft
 
-- Business objective: TBD
-- Business decision supported: TBD
-- Audience: TBD
-- Platform path: TBD
-- Known data expectations: TBD
-- Security and delivery expectations: TBD
+- Business objective: ${answerValue(questionAnswers, "business_objective")}
+- Business decision supported: ${answerValue(questionAnswers, "business_decision")}
+- Audience: ${answerValue(questionAnswers, "stakeholders", "audience")}
+- Platform path: ${answerValue(questionAnswers, "target_platform")}
+- Known data expectations: ${answerValue(questionAnswers, "data_expectations")}
+- Security and delivery expectations: ${answerValue(questionAnswers, "security_delivery")}
 
 ## KPI Catalog
 
 | KPI | Definition | Formula | Grain | Filters | Owner | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| TBD | TBD | TBD | TBD | TBD | TBD | Open |
+| ${escapePipes(answerValue(questionAnswers, "kpis"))} | ${escapePipes(answerValue(questionAnswers, "kpi_definitions"))} | TBD | TBD | ${escapePipes(answerValue(questionAnswers, "filters_time"))} | ${escapePipes(answerValue(questionAnswers, "stakeholders", "owner"))} | Draft |
 
 ## Open Questions
 
 | Priority | Question | Why it matters | Suggested owner |
 | --- | --- | --- | --- |
-| High | What exact KPI definitions and acceptance criteria should be used? | Blocks reliable SQL and testing. | Business owner |
+| High | ${escapePipes(answerValue(questionAnswers, "open_questions"))} | Blocks reliable SQL and testing. | Business owner |
 `;
   }
   if (phaseId === "02-ai-analysis-understanding") {
@@ -1024,12 +1074,13 @@ function phaseWorkProduct(phaseId) {
 
 | Requirement | Type | Source table.column | Transformation | Grain | Join path | Confidence | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| TBD | TBD | TBD | TBD | TBD | TBD | Low | Data owner |
+| ${escapePipes(answerValue(questionAnswers, "source_systems", "requirements"))} | KPI/data field | ${escapePipes(answerValue(questionAnswers, "schema_path", "source_fields"))} | ${escapePipes(answerValue(questionAnswers, "transformations"))} | ${escapePipes(answerValue(questionAnswers, "grain"))} | ${escapePipes(answerValue(questionAnswers, "joins"))} | Draft | Data owner |
 
 ## Data Quality Checks Needed
 
-- Provide schema, DDL, sample rows, data dictionary, existing SQL, or a data owner path.
-- Check duplicate risk, null rates, date freshness, and source grain before SQL drafting.
+- Data access path: ${answerValue(questionAnswers, "schema_path")}
+- Data quality risks: ${answerValue(questionAnswers, "quality_risks")}
+- Validation plan: ${answerValue(questionAnswers, "validation_plan")}
 `;
   }
   if (phaseId === "03-sql-draft-logic-preparation") {
@@ -1126,6 +1177,20 @@ function countStatuses(rows) {
 
 function escapePipes(value) {
   return String(value || "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ").slice(0, 500);
+}
+
+function answerValue(questionAnswers, ...keys) {
+  for (const key of keys) {
+    const value = String(questionAnswers?.[key] || "").trim();
+    if (value) return value;
+  }
+  return "TBD";
+}
+
+function humanizeQuestionKey(key) {
+  return String(key || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function getNextPhase(phaseId) {

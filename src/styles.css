@@ -75,7 +75,8 @@ button {
 .artifact-strip,
 .output-panel,
 .phase-guide-simple,
-.input-panel {
+.input-panel,
+.question-panel {
   border: 1px solid #d7dee6;
   background: #ffffff;
 }
@@ -90,6 +91,7 @@ button {
 .create-panel input,
 .create-panel select,
 .notes-input,
+.question-field textarea,
 .gate-card input,
 .gate-card select {
   width: 100%;
@@ -112,6 +114,12 @@ button {
 .notes-input {
   min-height: 96px;
   padding: 12px;
+  resize: vertical;
+}
+
+.question-field textarea {
+  min-height: 86px;
+  padding: 10px;
   resize: vertical;
 }
 
@@ -345,11 +353,64 @@ button {
 }
 
 .phase-guide-simple,
-.input-panel {
+.input-panel,
+.question-panel {
   display: grid;
   gap: 12px;
   padding: 14px;
   border-radius: 8px;
+}
+
+.question-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.question-header p {
+  margin: 6px 0 0;
+  color: #627084;
+  font-size: 13px;
+}
+
+.question-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.question-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid #edf1f5;
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.question-field span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #24364b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.question-field span strong {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #fff4e2;
+  color: #8a5400;
+  font-size: 11px;
+}
+
+.question-field small {
+  color: #627084;
+  line-height: 1.35;
 }
 
 .guide-lines {
@@ -387,15 +448,20 @@ button {
 }
 
 .gate-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  display: grid;
   gap: 14px;
   padding: 14px;
   border: 1px solid #d7dee6;
   border-radius: 8px;
   background: #f8fbfc;
+}
+
+.gate-summary-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .gate-summary h4 {
@@ -441,6 +507,61 @@ button {
 
 .metric.bad strong {
   color: #a33b2f;
+}
+
+.gate-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gate-progress-card {
+  display: grid;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid #d7dee6;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.gate-progress-head,
+.progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gate-progress-head strong {
+  color: #24364b;
+  font-size: 13px;
+}
+
+.gate-progress-head span {
+  color: #1f6b3d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.progress-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8eef4;
+}
+
+.progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: #1f8a4c;
+}
+
+.progress-meta {
+  color: #627084;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .phase-header h3 {
@@ -838,7 +959,7 @@ button {
 }
 
 @media (max-width: 1180px) {
-  .gate-summary {
+  .gate-summary-top {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -881,11 +1002,14 @@ button {
   .gate-metrics,
   .gate-card,
   .step-path,
-  .guide-line {
+  .guide-line,
+  .question-grid,
+  .gate-progress-grid {
     grid-template-columns: 1fr;
   }
 
   .input-panel-header,
+  .question-header,
   .gate-details summary {
     align-items: flex-start;
     flex-direction: column;

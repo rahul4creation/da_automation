@@ -44,6 +44,7 @@ export type Phase = {
   uploads: UploadArtifact[];
   gate: GateState;
   outputs: Array<{ name: string; path: string }>;
+  questionAnswers: Record<string, string>;
 };
 
 export type ProjectSummary = {

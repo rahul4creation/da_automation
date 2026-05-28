@@ -30,6 +30,233 @@ import {
 const statusOptions = ["Complete", "Incomplete", "Blocked", "Not applicable"] as const;
 
 type Toast = { type: "success" | "error" | "info"; message: string } | null;
+type PhaseQuestion = {
+  id: string;
+  label: string;
+  help: string;
+  placeholder: string;
+  required?: boolean;
+};
+
+const phaseQuestions: Record<string, PhaseQuestion[]> = {
+  "01-requirement-intake": [
+    {
+      id: "business_objective",
+      label: "Business objective",
+      help: "What decision or operational problem should this dashboard/report support?",
+      placeholder: "Example: Monitor daily station availability and highlight SCADA issues.",
+      required: true
+    },
+    {
+      id: "stakeholders",
+      label: "Stakeholders and audience",
+      help: "Who requests, uses, validates, and approves the output?",
+      placeholder: "Business owner, operations team, approver, technical owner",
+      required: true
+    },
+    {
+      id: "kpis",
+      label: "KPIs and measures",
+      help: "List the metrics, formulas if known, and any open KPI questions.",
+      placeholder: "Availability %, downtime minutes, active alarms, response SLA",
+      required: true
+    },
+    {
+      id: "filters_time",
+      label: "Filters and time logic",
+      help: "Capture date range, timezone, dimensions, default filters, and comparisons.",
+      placeholder: "Date range, line, station, equipment type, shift, timezone"
+    },
+    {
+      id: "data_expectations",
+      label: "Known data expectations",
+      help: "Mention known source systems, files, existing reports, or data owners.",
+      placeholder: "SCADA tables, current Excel, existing SQL, data owner"
+    },
+    {
+      id: "security_delivery",
+      label: "Security and delivery",
+      help: "Who can view/export it, how often it refreshes, and how it will be delivered.",
+      placeholder: "Viewer roles, export rules, refresh schedule, environment"
+    },
+    {
+      id: "acceptance_criteria",
+      label: "Acceptance criteria",
+      help: "What must be true before this phase can close?",
+      placeholder: "KPIs match source, filters work, owner approves requirement brief",
+      required: true
+    },
+    {
+      id: "open_questions",
+      label: "Open questions",
+      help: "Anything missing, unclear, or dependent on another owner.",
+      placeholder: "Exact formula for availability, source table owner, refresh SLA"
+    }
+  ],
+  "02-ai-analysis-understanding": [
+    {
+      id: "source_systems",
+      label: "Source systems",
+      help: "Which databases, files, schemas, or existing reports are relevant?",
+      placeholder: "PostgreSQL schema, SCADA source, existing dashboard query",
+      required: true
+    },
+    {
+      id: "schema_path",
+      label: "Database structure path",
+      help: "Where is schema, DDL, sample data, data dictionary, or owner path available?",
+      placeholder: "Upload path, schema name, data dictionary link, data owner",
+      required: true
+    },
+    {
+      id: "grain",
+      label: "Data grain",
+      help: "What is one row in each important source and in the final report?",
+      placeholder: "Per station per minute, per alarm event, per equipment per day"
+    },
+    {
+      id: "joins",
+      label: "Join keys and risks",
+      help: "Known joins, cardinality, duplicates, and missing key risks.",
+      placeholder: "station_id, device_id, event_time; one-to-many risk"
+    },
+    {
+      id: "transformations",
+      label: "Transformations",
+      help: "Calculations, exclusions, statuses, null handling, and conversions.",
+      placeholder: "Exclude maintenance windows, convert seconds to minutes"
+    },
+    {
+      id: "quality_risks",
+      label: "Data quality risks",
+      help: "Known nulls, late data, duplicate events, mismatch risks, or volume concerns.",
+      placeholder: "Late events, null station mapping, duplicate alarms"
+    },
+    {
+      id: "validation_plan",
+      label: "Validation plan",
+      help: "How should SQL and output be reconciled?",
+      placeholder: "Compare totals with current Excel, row counts, duplicate checks"
+    }
+  ],
+  "03-sql-draft-logic-preparation": [
+    {
+      id: "sql_target",
+      label: "SQL target",
+      help: "What should be produced: dashboard query, dataset, view, export, or report dataset?",
+      placeholder: "Grafana panel query, Superset dataset, materialized view",
+      required: true
+    },
+    {
+      id: "kpi_rules",
+      label: "KPI rules",
+      help: "Confirmed formulas, filters, date logic, and units.",
+      placeholder: "Availability = uptime / planned time, exclude maintenance"
+    },
+    {
+      id: "parameters",
+      label: "Parameters",
+      help: "Date ranges, filters, role constraints, and optional parameters.",
+      placeholder: ":start_date, :end_date, station, line, equipment_type"
+    },
+    {
+      id: "performance_notes",
+      label: "Performance notes",
+      help: "Large tables, indexes, caching, materialization, or known query limits.",
+      placeholder: "Partition by event_date, index station_id, cache daily summary"
+    }
+  ],
+  "04-dashboard-report-development": [
+    {
+      id: "layout",
+      label: "Layout and sections",
+      help: "Pages, sections, panels, report bands, or exports needed.",
+      placeholder: "Summary, station detail, trend, exception list",
+      required: true
+    },
+    {
+      id: "visuals",
+      label: "Visual inventory",
+      help: "Charts, tables, KPI cards, drilldowns, and field-level output.",
+      placeholder: "KPI cards, availability trend, station table, alarm bar chart"
+    },
+    {
+      id: "filter_behavior",
+      label: "Filter behavior",
+      help: "Defaults, interactions, date controls, and scope.",
+      placeholder: "Default current day, station filter affects all panels"
+    },
+    {
+      id: "access_expectations",
+      label: "Access expectations",
+      help: "Roles, sensitive fields, export permission, and row restrictions.",
+      placeholder: "Ops viewers, managers can export, no row-level restriction"
+    }
+  ],
+  "05-ai-review-validation": [
+    {
+      id: "review_scope",
+      label: "Review scope",
+      help: "What should be reviewed across requirement, SQL, UX, access, and governance?",
+      placeholder: "Requirement coverage, SQL joins, filter UX, export behavior",
+      required: true
+    },
+    {
+      id: "review_evidence",
+      label: "Review evidence",
+      help: "Artifacts available for review.",
+      placeholder: "Screenshots, SQL file, dashboard export, comparison report"
+    },
+    {
+      id: "known_findings",
+      label: "Known findings",
+      help: "Known issues, severity, owner, and blocking status.",
+      placeholder: "High: missing station filter owner Rahul, blocking"
+    }
+  ],
+  "06-testing-verification": [
+    {
+      id: "test_scope",
+      label: "Test scope",
+      help: "Acceptance, data, UI/report, access, and performance tests to run.",
+      placeholder: "KPI reconciliation, filter tests, export test, role test",
+      required: true
+    },
+    {
+      id: "expected_results",
+      label: "Expected results",
+      help: "Trusted source, sample, previous report, or stakeholder values.",
+      placeholder: "Current Excel totals, agreed sample date, source query output"
+    },
+    {
+      id: "defects",
+      label: "Defects and retest",
+      help: "Defects, severity, owner, fix status, and retest status.",
+      placeholder: "D-001 High filter mismatch fixed, retest pending"
+    }
+  ],
+  "07-approval-delivery": [
+    {
+      id: "delivery_artifact",
+      label: "Final artifact",
+      help: "Final link, environment, version, and release package.",
+      placeholder: "Grafana URL, production workspace, v1.0 release",
+      required: true
+    },
+    {
+      id: "signoff",
+      label: "Sign-off",
+      help: "Business and technical approval evidence.",
+      placeholder: "Email from owner, UAT approval, release approval"
+    },
+    {
+      id: "support_handoff",
+      label: "Support handoff",
+      help: "Support owner, escalation path, limitations, rollback, and monitoring.",
+      placeholder: "Support team, rollback steps, known limitations, monitoring checks"
+    }
+  ]
+};
 
 const phaseGuidance: Record<string, { userAction: string; uploads: string; output: string; gateFocus: string }> = {
   "01-requirement-intake": {
@@ -83,6 +310,7 @@ export default function App() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [activePhaseId, setActivePhaseId] = useState("");
   const [notes, setNotes] = useState("");
+  const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const [createForm, setCreateForm] = useState({
@@ -105,6 +333,10 @@ export default function App() {
     if (!selectedProjectId) return;
     void loadProject(selectedProjectId);
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    setQuestionAnswers(activePhase?.questionAnswers || {});
+  }, [activePhase?.id, activePhase?.questionAnswers]);
 
   function scrollToSection(sectionId: string) {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -167,7 +399,7 @@ export default function App() {
       setBusy(true);
       const result = await apiPost<{ output: string }>(
         `/api/projects/${project.projectId}/phases/${activePhase.id}/run`,
-        { notes }
+        { notes, questionAnswers }
       );
       setToast({ type: "success", message: "Agent output generated" });
       setNotes("");
@@ -190,6 +422,42 @@ export default function App() {
       await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/gate`, { gate });
       setToast({ type: "success", message: "Gate saved" });
       await loadProject(project.projectId);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveQuestionAnswers() {
+    if (!project || !activePhase) return;
+    try {
+      setBusy(true);
+      await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/questions`, { questionAnswers });
+      setToast({ type: "success", message: "Guided answers saved" });
+      await loadProject(project.projectId);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function generateArtifactFromQuestions() {
+    if (!project || !activePhase) return;
+    try {
+      setBusy(true);
+      await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/questions`, { questionAnswers });
+      await apiPost(`/api/projects/${project.projectId}/phases/${activePhase.id}/run`, {
+        notes,
+        questionAnswers
+      });
+      setToast({ type: "success", message: "Artifact generated from guided answers" });
+      setNotes("");
+      await loadProject(project.projectId);
+      window.requestAnimationFrame(() => {
+        document.getElementById("agent-output")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     } catch (error) {
       showError(error);
     } finally {
@@ -229,6 +497,7 @@ export default function App() {
         setProject(null);
         setActivePhaseId("");
         setNotes("");
+        setQuestionAnswers({});
       }
       await refreshProjects();
       setToast({ type: "success", message: `${item.projectName} moved to trash: ${result.trashPath}` });
@@ -248,7 +517,8 @@ export default function App() {
       await apiPost(`/api/projects/${project.projectId}/phases/${activePhase.id}/uploads`, formData);
       setToast({ type: "info", message: `${files.length} artifact(s) uploaded. Running agent...` });
       await apiPost(`/api/projects/${project.projectId}/phases/${activePhase.id}/run`, {
-        notes: notes || "Analyze newly uploaded artifact(s)."
+        notes: notes || "Analyze newly uploaded artifact(s).",
+        questionAnswers
       });
       setToast({ type: "success", message: `${files.length} artifact(s) uploaded and analyzed` });
       await loadProject(project.projectId);
@@ -409,11 +679,20 @@ export default function App() {
               <NextStepPanel
                 phase={activePhase}
                 notes={notes}
+                answeredQuestions={countAnsweredQuestions(activePhase.id, questionAnswers)}
                 busy={busy}
-                onGoToInputs={() => scrollToSection("phase-inputs")}
+                onGoToInputs={() => scrollToSection("phase-questions")}
                 onRun={runAgent}
                 onReviewGates={openGateChecklist}
                 onComplete={completePhase}
+              />
+              <QuestionnairePanel
+                phase={activePhase}
+                answers={questionAnswers}
+                onChange={setQuestionAnswers}
+                onSave={saveQuestionAnswers}
+                onGenerate={generateArtifactFromQuestions}
+                disabled={busy}
               />
               <PhaseGuide phase={activePhase} />
               <GateSummary phase={activePhase} />
@@ -485,6 +764,7 @@ export default function App() {
 function NextStepPanel({
   phase,
   notes,
+  answeredQuestions,
   busy,
   onGoToInputs,
   onRun,
@@ -493,6 +773,7 @@ function NextStepPanel({
 }: {
   phase: Phase;
   notes: string;
+  answeredQuestions: number;
   busy: boolean;
   onGoToInputs: () => void;
   onRun: () => void;
@@ -500,7 +781,7 @@ function NextStepPanel({
   onComplete: () => void;
 }) {
   const hasAgentOutput = phase.outputs.length > 0;
-  const hasInput = notes.trim().length > 0 || phase.uploads.length > 0 || hasAgentOutput;
+  const hasInput = notes.trim().length > 0 || phase.uploads.length > 0 || answeredQuestions > 0 || hasAgentOutput;
   const blockers = countGateBlockers(phase);
   const isCompleted = phase.state.status === "completed";
 
@@ -573,8 +854,8 @@ function getNextStep({
     return {
       key: "input" as const,
       title: "Start by adding phase input.",
-      detail: "Upload the available artifact or type the instruction the agent should analyze.",
-      action: "Go to input",
+      detail: "Answer the guided questions, upload an artifact, or add short notes for the agent.",
+      action: "Answer questions",
       icon: <Upload size={16} />
     };
   }
@@ -603,6 +884,76 @@ function getNextStep({
     action: "Complete phase",
     icon: <CheckCircle2 size={16} />
   };
+}
+
+function QuestionnairePanel({
+  phase,
+  answers,
+  onChange,
+  onSave,
+  onGenerate,
+  disabled
+}: {
+  phase: Phase;
+  answers: Record<string, string>;
+  onChange: (answers: Record<string, string>) => void;
+  onSave: () => void;
+  onGenerate: () => void;
+  disabled: boolean;
+}) {
+  const questions = phaseQuestions[phase.id] || [];
+  const answered = countAnsweredQuestions(phase.id, answers);
+  const requiredQuestions = questions.filter((question) => question.required);
+  const requiredAnswered = requiredQuestions.filter((question) => answers[question.id]?.trim()).length;
+
+  function updateAnswer(questionId: string, value: string) {
+    onChange({ ...answers, [questionId]: value });
+  }
+
+  return (
+    <section className="question-panel" id="phase-questions">
+      <div className="question-header">
+        <div>
+          <div className="section-title">
+            <FileText size={16} />
+            <span>Guided Questions</span>
+          </div>
+          <p>
+            {answered} of {questions.length} answered
+            {requiredQuestions.length > 0 ? `, ${requiredAnswered} of ${requiredQuestions.length} required` : ""}
+          </p>
+        </div>
+        <div className="workbench-actions">
+          <button className="secondary-btn" onClick={onSave} disabled={disabled}>
+            <Save size={16} />
+            Save Answers
+          </button>
+          <button className="primary-btn" onClick={onGenerate} disabled={disabled || answered === 0}>
+            {disabled ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
+            Generate Artifact
+          </button>
+        </div>
+      </div>
+
+      <div className="question-grid">
+        {questions.map((question) => (
+          <label className="question-field" key={question.id}>
+            <span>
+              {question.label}
+              {question.required ? <strong>Required</strong> : null}
+            </span>
+            <small>{question.help}</small>
+            <textarea
+              aria-label={question.label}
+              value={answers[question.id] || ""}
+              onChange={(event) => updateAnswer(question.id, event.target.value)}
+              placeholder={question.placeholder}
+            />
+          </label>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function PhaseHeader({ phase, project }: { phase: Phase; project: ProjectDetail }) {
@@ -662,19 +1013,55 @@ function GateSummary({ phase }: { phase: Phase }) {
     { Complete: 0, Incomplete: 0, Blocked: 0, "Not applicable": 0 } as Record<string, number>
   );
   const blockers = countGateBlockers(phase);
+  const groups = [
+    { label: "Project Context", rows: phase.gate.projectContext },
+    { label: "Entry Gate", rows: phase.gate.entry },
+    { label: "Exit Gate", rows: phase.gate.exit }
+  ];
   return (
     <section className="gate-summary">
-      <div>
-        <span className="eyebrow">Gate readiness</span>
-        <h4>{blockers === 0 ? "Ready for phase completion review" : `${blockers} gate item(s) still blocking`}</h4>
+      <div className="gate-summary-top">
+        <div>
+          <span className="eyebrow">Gate readiness</span>
+          <h4>{blockers === 0 ? "Ready for phase completion review" : `${blockers} gate item(s) still blocking`}</h4>
+        </div>
+        <div className="gate-metrics">
+          <Metric label="Complete" value={counts.Complete} tone="good" />
+          <Metric label="Incomplete" value={counts.Incomplete} tone="warn" />
+          <Metric label="Blocked" value={counts.Blocked} tone="bad" />
+          <Metric label="N/A" value={counts["Not applicable"]} tone="neutral" />
+        </div>
       </div>
-      <div className="gate-metrics">
-        <Metric label="Complete" value={counts.Complete} tone="good" />
-        <Metric label="Incomplete" value={counts.Incomplete} tone="warn" />
-        <Metric label="Blocked" value={counts.Blocked} tone="bad" />
-        <Metric label="N/A" value={counts["Not applicable"]} tone="neutral" />
+      <div className="gate-progress-grid">
+        {groups.map((group) => (
+          <GateProgressCard key={group.label} label={group.label} rows={group.rows} />
+        ))}
       </div>
     </section>
+  );
+}
+
+function GateProgressCard({ label, rows }: { label: string; rows: GateRow[] }) {
+  const total = rows.length;
+  const clear = rows.filter((row) => !isGateBlocking(row)).length;
+  const blockers = rows.filter((row) => isGateBlocking(row)).length;
+  const percent = total === 0 ? 0 : Math.round((clear / total) * 100);
+  return (
+    <div className="gate-progress-card">
+      <div className="gate-progress-head">
+        <strong>{label}</strong>
+        <span>{percent}%</span>
+      </div>
+      <div className="progress-track" aria-label={`${label} progress`}>
+        <span className="progress-fill" style={{ width: `${percent}%` }} />
+      </div>
+      <div className="progress-meta">
+        <span>
+          {clear}/{total} clear
+        </span>
+        <span>{blockers} blocking</span>
+      </div>
+    </div>
   );
 }
 
@@ -831,10 +1218,19 @@ function GateDot({ phase }: { phase: Phase }) {
   return <Circle className="gate-dot ready" size={18} />;
 }
 
+function countAnsweredQuestions(phaseId: string, answers: Record<string, string>) {
+  const questions = phaseQuestions[phaseId] || [];
+  return questions.filter((question) => answers[question.id]?.trim()).length;
+}
+
 function countGateBlockers(phase: Phase) {
   return [...phase.gate.projectContext, ...phase.gate.entry, ...phase.gate.exit].filter(
-    (row) => row.status === "Incomplete" || row.status === "Blocked" || (row.status === "Not applicable" && !row.notes && !row.evidence)
+    (row) => isGateBlocking(row)
   ).length;
+}
+
+function isGateBlocking(row: GateRow) {
+  return row.status === "Incomplete" || row.status === "Blocked" || (row.status === "Not applicable" && !row.notes && !row.evidence);
 }
 
 function statusClass(status: GateRow["status"]) {
