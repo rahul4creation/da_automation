@@ -33,6 +33,7 @@ test("project phase workflow smoke", async ({ page }) => {
 
   await expect(page.getByText("UX Smoke Project").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Requirement Intake" })).toBeVisible();
+  await expect(page.getByText("What to do next")).toBeVisible();
   await expect(page.getByText("Phase Gates")).toBeVisible();
   await expect(page.getByText("Work to do")).toBeVisible();
   await expect(page.getByText("Gate readiness")).toBeVisible();
@@ -50,6 +51,7 @@ test("project phase workflow smoke", async ({ page }) => {
   for (const heading of phaseHeadings) {
     await page.getByRole("button", { name: new RegExp(heading) }).click();
     await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(page.getByText("What to do next", { exact: true })).toBeVisible();
     await expect(page.getByText("Work to do", { exact: true })).toBeVisible();
     await expect(page.getByText("Useful uploads", { exact: true })).toBeVisible();
     await expect(page.getByText("Expected output", { exact: true })).toBeVisible();
@@ -59,7 +61,7 @@ test("project phase workflow smoke", async ({ page }) => {
   await page.getByRole("button", { name: new RegExp("Requirement Intake") }).click();
 
   await page
-    .getByPlaceholder("Add phase notes, stakeholder input, SQL comments, or instructions for this run")
+    .getByPlaceholder("Add notes, SQL comments, stakeholder input, or instructions for this run")
     .fill("Need operational dashboard for request intake smoke test.");
 
   const fixtureDir = path.join(repoRoot, "tmp", "ui-test-fixtures");

@@ -104,6 +104,16 @@ export default function App() {
     void loadProject(selectedProjectId);
   }, [selectedProjectId]);
 
+  function scrollToSection(sectionId: string) {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openGateChecklist() {
+    const gateDetails = document.getElementById("gate-details") as HTMLDetailsElement | null;
+    if (gateDetails) gateDetails.open = true;
+    scrollToSection("gate-checklist");
+  }
+
   async function bootstrap() {
     try {
       const [{ phases }, { projects: loadedProjects }] = await Promise.all([
@@ -360,32 +370,56 @@ export default function App() {
 
             <section className="phase-workbench">
               <PhaseHeader phase={activePhase} project={project} />
+              <NextStepPanel
+                phase={activePhase}
+                notes={notes}
+                busy={busy}
+                onGoToInputs={() => scrollToSection("phase-inputs")}
+                onRun={runAgent}
+                onReviewGates={openGateChecklist}
+                onComplete={completePhase}
+              />
               <PhaseGuide phase={activePhase} />
               <GateSummary phase={activePhase} />
 
-              <div className="workbench-actions">
-                <UploadButton onUpload={uploadFiles} disabled={busy} />
-                <button className="secondary-btn" onClick={runAgent} disabled={busy}>
-                  {busy ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
-                  Run Agent
-                </button>
-                <button
-                  className="primary-btn"
-                  onClick={completePhase}
-                  disabled={busy || countGateBlockers(activePhase) > 0}
-                  title={countGateBlockers(activePhase) > 0 ? "Resolve all incomplete or blocked gate items first" : "Complete this phase"}
-                >
-                  <CheckCircle2 size={16} />
-                  Complete Phase
-                </button>
-              </div>
+              <section className="input-panel" id="phase-inputs">
+                <div className="input-panel-header">
+                  <div>
+                    <div className="section-title">
+                      <Upload size={16} />
+                      <span>Phase Input</span>
+                    </div>
+                    <p>Add the artifact or short instruction the agent should use for this phase.</p>
+                  </div>
+                  <div className="workbench-actions">
+                    <UploadButton onUpload={uploadFiles} disabled={busy} />
+                    <button className="secondary-btn" onClick={runAgent} disabled={busy}>
+                      {busy ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
+                      Run Agent
+                    </button>
+                    <button
+                      className="primary-btn"
+                      onClick={completePhase}
+                      disabled={busy || countGateBlockers(activePhase) > 0}
+                      title={
+                        countGateBlockers(activePhase) > 0
+                          ? "Resolve all incomplete or blocked gate items first"
+                          : "Complete this phase"
+                      }
+                    >
+                      <CheckCircle2 size={16} />
+                      Complete Phase
+                    </button>
+                  </div>
+                </div>
 
-              <textarea
-                className="notes-input"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Add phase notes, stakeholder input, SQL comments, or instructions for this run"
-              />
+                <textarea
+                  className="notes-input"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Add notes, SQL comments, stakeholder input, or instructions for this run"
+                />
+              </section>
 
               <ArtifactStrip phase={activePhase} />
 
@@ -412,6 +446,129 @@ export default function App() {
   );
 }
 
+function NextStepPanel({
+  phase,
+  notes,
+  busy,
+  onGoToInputs,
+  onRun,
+  onReviewGates,
+  onComplete
+}: {
+  phase: Phase;
+  notes: string;
+  busy: boolean;
+  onGoToInputs: () => void;
+  onRun: () => void;
+  onReviewGates: () => void;
+  onComplete: () => void;
+}) {
+  const hasAgentOutput = phase.outputs.length > 0;
+  const hasInput = notes.trim().length > 0 || phase.uploads.length > 0 || hasAgentOutput;
+  const blockers = countGateBlockers(phase);
+  const isCompleted = phase.state.status === "completed";
+
+  const nextStep = getNextStep({ hasInput, hasAgentOutput, blockers, isCompleted });
+  const steps = [
+    { key: "input", label: "Add input", done: hasInput, active: nextStep.key === "input" },
+    { key: "agent", label: "Run agent", done: hasAgentOutput, active: nextStep.key === "agent" },
+    { key: "review", label: "Review", done: hasAgentOutput && blockers === 0, active: nextStep.key === "review" },
+    { key: "complete", label: "Complete", done: blockers === 0 || isCompleted, active: nextStep.key === "complete" }
+  ];
+
+  const actions = {
+    input: onGoToInputs,
+    agent: onRun,
+    review: onReviewGates,
+    complete: onComplete,
+    done: () => document.getElementById("agent-output")?.scrollIntoView({ behavior: "smooth", block: "start" })
+  };
+
+  return (
+    <section className="next-step-panel" aria-label="What to do next">
+      <div className="next-step-copy">
+        <span className="eyebrow">What to do next</span>
+        <h4>{nextStep.title}</h4>
+        <p>{nextStep.detail}</p>
+      </div>
+      <div className="next-step-side">
+        <div className="step-path" aria-label="Phase progress">
+          {steps.map((step) => (
+            <span className={`step-chip ${step.done ? "done" : ""} ${step.active ? "active" : ""}`} key={step.key}>
+              {step.done ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+              {step.label}
+            </span>
+          ))}
+        </div>
+        <button
+          className={nextStep.key === "complete" ? "primary-btn" : "secondary-btn"}
+          onClick={actions[nextStep.key]}
+          disabled={busy || (nextStep.key === "complete" && blockers > 0)}
+        >
+          {busy ? <Loader2 className="spin" size={16} /> : nextStep.icon}
+          {nextStep.action}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function getNextStep({
+  hasInput,
+  hasAgentOutput,
+  blockers,
+  isCompleted
+}: {
+  hasInput: boolean;
+  hasAgentOutput: boolean;
+  blockers: number;
+  isCompleted: boolean;
+}) {
+  if (isCompleted) {
+    return {
+      key: "done" as const,
+      title: "This phase is complete.",
+      detail: "Use the phase list to continue with the next open phase or review the saved output.",
+      action: "View output",
+      icon: <FileText size={16} />
+    };
+  }
+  if (!hasInput) {
+    return {
+      key: "input" as const,
+      title: "Start by adding phase input.",
+      detail: "Upload the available artifact or type the instruction the agent should analyze.",
+      action: "Go to input",
+      icon: <Upload size={16} />
+    };
+  }
+  if (!hasAgentOutput) {
+    return {
+      key: "agent" as const,
+      title: "Run the phase agent.",
+      detail: "The agent will read the notes and uploads, then create the phase output below.",
+      action: "Run agent",
+      icon: <Play size={16} />
+    };
+  }
+  if (blockers > 0) {
+    return {
+      key: "review" as const,
+      title: "Review the gate checklist.",
+      detail: `${blockers} gate item(s) still need evidence, owner updates, or resolution before this phase can close.`,
+      action: "Open gates",
+      icon: <ShieldCheck size={16} />
+    };
+  }
+  return {
+    key: "complete" as const,
+    title: "Complete this phase.",
+    detail: "All gate items are clear. Mark the phase complete to move to the next phase.",
+    action: "Complete phase",
+    icon: <CheckCircle2 size={16} />
+  };
+}
+
 function PhaseHeader({ phase, project }: { phase: Phase; project: ProjectDetail }) {
   return (
     <section className="phase-header">
@@ -432,33 +589,27 @@ function PhaseHeader({ phase, project }: { phase: Phase; project: ProjectDetail 
 function PhaseGuide({ phase }: { phase: Phase }) {
   const guidance = phaseGuidance[phase.id];
   return (
-    <section className="phase-guide">
-      <div className="guide-card">
-        <Play size={16} />
-        <div>
-          <strong>Work to do</strong>
-          <p>{guidance.userAction}</p>
-        </div>
-      </div>
-      <div className="guide-card">
-        <Upload size={16} />
-        <div>
-          <strong>Useful uploads</strong>
-          <p>{guidance.uploads}</p>
-        </div>
-      </div>
-      <div className="guide-card">
-        <FileText size={16} />
-        <div>
-          <strong>Expected output</strong>
-          <p>{guidance.output}</p>
-        </div>
-      </div>
-      <div className="guide-card">
+    <section className="phase-guide-simple">
+      <div className="section-title">
         <ShieldCheck size={16} />
-        <div>
+        <span>Phase Guide</span>
+      </div>
+      <div className="guide-lines">
+        <div className="guide-line">
+          <strong>Work to do</strong>
+          <span>{guidance.userAction}</span>
+        </div>
+        <div className="guide-line">
+          <strong>Useful uploads</strong>
+          <span>{guidance.uploads}</span>
+        </div>
+        <div className="guide-line">
+          <strong>Expected output</strong>
+          <span>{guidance.output}</span>
+        </div>
+        <div className="guide-line">
           <strong>Gate focus</strong>
-          <p>{guidance.gateFocus}</p>
+          <span>{guidance.gateFocus}</span>
         </div>
       </div>
     </section>
@@ -523,6 +674,7 @@ function ArtifactStrip({ phase }: { phase: Phase }) {
 
 function GateEditor({ phase, onSave, disabled }: { phase: Phase; onSave: (gate: GateState) => void; disabled: boolean }) {
   const [gate, setGate] = useState<GateState>(phase.gate);
+  const blockers = countGateBlockers(phase);
 
   useEffect(() => {
     setGate(phase.gate);
@@ -536,20 +688,34 @@ function GateEditor({ phase, onSave, disabled }: { phase: Phase; onSave: (gate: 
   }
 
   return (
-    <section className="gate-panel">
-      <div className="gate-heading">
-        <div className="section-title">
-          <CheckCircle2 size={16} />
-          <span>Phase Gates</span>
+    <section className="gate-panel" id="gate-checklist">
+      <details className="gate-details" id="gate-details">
+        <summary>
+          <div className="gate-summary-row">
+            <CheckCircle2 size={16} />
+            <div>
+              <strong>Phase Gates</strong>
+              <span>{blockers === 0 ? "All gate items are clear" : `${blockers} item(s) need attention`}</span>
+            </div>
+          </div>
+          <span className="gate-count-pill">Show checklist</span>
+        </summary>
+        <div className="gate-details-body">
+          <div className="gate-heading">
+            <div className="section-title">
+              <CheckCircle2 size={16} />
+              <span>Gate Checklist</span>
+            </div>
+            <button className="secondary-btn" onClick={() => onSave(gate)} disabled={disabled}>
+              <Save size={16} />
+              Save Gate
+            </button>
+          </div>
+          <GateTable title="Project Context" rows={gate.projectContext} onChange={(index, patch) => updateRow("projectContext", index, patch)} />
+          <GateTable title="Entry Gate" rows={gate.entry} onChange={(index, patch) => updateRow("entry", index, patch)} />
+          <GateTable title="Exit Gate" rows={gate.exit} onChange={(index, patch) => updateRow("exit", index, patch)} />
         </div>
-        <button className="secondary-btn" onClick={() => onSave(gate)} disabled={disabled}>
-          <Save size={16} />
-          Save Gate
-        </button>
-      </div>
-      <GateTable title="Project Context" rows={gate.projectContext} onChange={(index, patch) => updateRow("projectContext", index, patch)} />
-      <GateTable title="Entry Gate" rows={gate.entry} onChange={(index, patch) => updateRow("entry", index, patch)} />
-      <GateTable title="Exit Gate" rows={gate.exit} onChange={(index, patch) => updateRow("exit", index, patch)} />
+      </details>
     </section>
   );
 }
