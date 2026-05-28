@@ -1,5 +1,7 @@
 import {
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   Circle,
   FileText,
@@ -902,12 +904,45 @@ function QuestionnairePanel({
   disabled: boolean;
 }) {
   const questions = phaseQuestions[phase.id] || [];
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const answered = countAnsweredQuestions(phase.id, answers);
   const requiredQuestions = questions.filter((question) => question.required);
   const requiredAnswered = requiredQuestions.filter((question) => answers[question.id]?.trim()).length;
+  const missingRequired = requiredQuestions.filter((question) => !answers[question.id]?.trim());
+  const completionPercent = questions.length === 0 ? 100 : Math.round((answered / questions.length) * 100);
+  const isReviewStep = activeQuestionIndex >= questions.length;
+  const activeQuestion = questions[Math.min(activeQuestionIndex, Math.max(questions.length - 1, 0))];
+  const activeAnswer = activeQuestion ? answers[activeQuestion.id] || "" : "";
+  const currentQuestionComplete = !activeQuestion?.required || activeAnswer.trim().length > 0;
+  const canGenerate = phase.uploads.length > 0 || missingRequired.length === 0;
+
+  useEffect(() => {
+    setActiveQuestionIndex(0);
+  }, [phase.id]);
 
   function updateAnswer(questionId: string, value: string) {
     onChange({ ...answers, [questionId]: value });
+  }
+
+  function goNext() {
+    if (!currentQuestionComplete) return;
+    setActiveQuestionIndex((current) => Math.min(current + 1, questions.length));
+  }
+
+  function goBack() {
+    setActiveQuestionIndex((current) => Math.max(current - 1, 0));
+  }
+
+  if (!activeQuestion) {
+    return (
+      <section className="question-panel" id="phase-questions">
+        <div className="section-title">
+          <FileText size={16} />
+          <span>Step-by-step Questions</span>
+        </div>
+        <p className="empty-note">No guided questions configured for this phase.</p>
+      </section>
+    );
   }
 
   return (
@@ -916,41 +951,129 @@ function QuestionnairePanel({
         <div>
           <div className="section-title">
             <FileText size={16} />
-            <span>Guided Questions</span>
+            <span>Step-by-step Questions</span>
           </div>
           <p>
-            {answered} of {questions.length} answered
+            {completionPercent}% complete, {answered} of {questions.length} answered
             {requiredQuestions.length > 0 ? `, ${requiredAnswered} of ${requiredQuestions.length} required` : ""}
           </p>
         </div>
         <div className="workbench-actions">
           <button className="secondary-btn" onClick={onSave} disabled={disabled}>
             <Save size={16} />
-            Save Answers
-          </button>
-          <button className="primary-btn" onClick={onGenerate} disabled={disabled || answered === 0}>
-            {disabled ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
-            Generate Artifact
+            Save Progress
           </button>
         </div>
       </div>
 
-      <div className="question-grid">
-        {questions.map((question) => (
-          <label className="question-field" key={question.id}>
-            <span>
-              {question.label}
-              {question.required ? <strong>Required</strong> : null}
+      <div className="question-progress-row">
+        <div className="progress-track" aria-label="Question completion progress">
+          <span className="progress-fill" style={{ width: `${completionPercent}%` }} />
+        </div>
+        <strong>{completionPercent}%</strong>
+      </div>
+
+      <div className="question-wizard">
+        <div className="question-step-list" aria-label="Question steps">
+          {questions.map((question, index) => {
+            const isAnswered = Boolean(answers[question.id]?.trim());
+            const isActive = !isReviewStep && index === activeQuestionIndex;
+            return (
+              <button
+                className={`question-step-button ${isActive ? "active" : ""} ${isAnswered ? "done" : ""}`}
+                key={question.id}
+                onClick={() => setActiveQuestionIndex(index)}
+                type="button"
+              >
+                {isAnswered ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+                <span>{index + 1}</span>
+                <small>{question.label}</small>
+              </button>
+            );
+          })}
+          <button
+            className={`question-step-button review ${isReviewStep ? "active" : ""}`}
+            onClick={() => setActiveQuestionIndex(questions.length)}
+            type="button"
+          >
+            <FileText size={15} />
+            <span>{questions.length + 1}</span>
+            <small>Review & generate</small>
+          </button>
+        </div>
+
+        {isReviewStep ? (
+          <div className="question-review">
+            <span className="eyebrow">Final Step</span>
+            <h4>Review answers and generate the phase artifact</h4>
+            <p>
+              The artifact will be generated from your saved answers, uploaded files, and optional notes. Missing optional answers will stay open;
+              missing required answers are shown below.
+            </p>
+            <div className="review-metrics">
+              <Metric label="Answered" value={answered} tone="good" />
+              <Metric label="Required" value={requiredAnswered} tone={missingRequired.length === 0 ? "good" : "warn"} />
+              <Metric label="Uploads" value={phase.uploads.length} tone="neutral" />
+            </div>
+            {missingRequired.length > 0 ? (
+              <div className="missing-list">
+                <strong>Required answers still missing</strong>
+                {missingRequired.map((question) => (
+                  <button key={question.id} onClick={() => setActiveQuestionIndex(questions.indexOf(question))} type="button">
+                    {question.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="ready-note">
+                <CheckCircle2 size={17} />
+                Required questions are complete.
+              </div>
+            )}
+            <div className="question-footer">
+              <button className="secondary-btn" onClick={goBack} disabled={disabled || questions.length === 0}>
+                <ArrowLeft size={16} />
+                Back
+              </button>
+              <button className="primary-btn" onClick={onGenerate} disabled={disabled || !canGenerate}>
+                {disabled ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
+                Generate Artifact
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label className="question-card">
+            <span className="eyebrow">
+              Question {activeQuestionIndex + 1} of {questions.length}
             </span>
-            <small>{question.help}</small>
+            <div className="question-card-title">
+              <h4>{activeQuestion.label}</h4>
+              <strong>{activeQuestion.required ? "Required" : "Optional"}</strong>
+            </div>
+            <p>{activeQuestion.help}</p>
             <textarea
-              aria-label={question.label}
-              value={answers[question.id] || ""}
-              onChange={(event) => updateAnswer(question.id, event.target.value)}
-              placeholder={question.placeholder}
+              aria-label={activeQuestion.label}
+              value={activeAnswer}
+              onChange={(event) => updateAnswer(activeQuestion.id, event.target.value)}
+              placeholder={activeQuestion.placeholder}
             />
+            {!currentQuestionComplete && <small className="question-warning">Answer this required question before continuing.</small>}
+            <div className="question-footer">
+              <button className="secondary-btn" onClick={goBack} disabled={disabled || activeQuestionIndex === 0}>
+                <ArrowLeft size={16} />
+                Back
+              </button>
+              <button className="secondary-btn" onClick={onSave} disabled={disabled}>
+                <Save size={16} />
+                Save Answer
+              </button>
+              <button className="primary-btn" onClick={goNext} disabled={disabled || !currentQuestionComplete}>
+                {activeQuestionIndex === questions.length - 1 ? "Review Answers" : "Next Question"}
+                <ArrowRight size={16} />
+              </button>
+            </div>
           </label>
-        ))}
+        )}
       </div>
     </section>
   );
