@@ -11,10 +11,12 @@ import { promisify } from "node:util";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
+loadEnvFile(path.join(ROOT, ".env"));
 const PROJECTS_ROOT = path.join(ROOT, "projects");
 const SKILL_ROOT = path.join(ROOT, "ai-assisted-reporting-dashboard");
 const EXCEL_PREVIEW_SCRIPT = path.join(ROOT, "scripts", "excel-preview.py");
-const PORT = Number(process.env.PORT || 8787);
+const API_HOST = process.env.API_HOST || "127.0.0.1";
+const PORT = readPort(process.env.API_PORT || process.env.PORT, 8787);
 const execFileAsync = promisify(execFile);
 
 const PHASES = [
@@ -419,8 +421,8 @@ app.use((error, req, res, next) => {
   res.status(status).json({ error: error.message || "Unexpected server error." });
 });
 
-app.listen(PORT, "127.0.0.1", () => {
-  console.log(`DA automation API listening on http://127.0.0.1:${PORT}`);
+app.listen(PORT, API_HOST, () => {
+  console.log(`DA automation API listening on http://${API_HOST}:${PORT}`);
 });
 
 function phasePath(projectId, phaseId, ...parts) {
@@ -429,6 +431,28 @@ function phasePath(projectId, phaseId, ...parts) {
 
 function projectPath(projectId, ...parts) {
   return path.join(PROJECTS_ROOT, projectId, ...parts);
+}
+
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match) continue;
+    const key = match[1];
+    let value = match[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+function readPort(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 && parsed < 65536 ? parsed : fallback;
 }
 
 function assertInside(baseDir, targetPath) {

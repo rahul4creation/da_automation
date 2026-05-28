@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "node server/index.js",
-    "dev:client": "vite --host 127.0.0.1 --port 5173",
+    "dev:client": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "preview": "vite preview",
     "test:ui": "playwright test"
   },
   "dependencies": {
