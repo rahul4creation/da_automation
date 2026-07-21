@@ -1,0 +1,116 @@
+{
+  "name": "da-automation-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "node ../node_modules/concurrently/dist/bin/concurrently.js \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "node server/index.js",
+    "dev:client": "node ../node_modules/vite/bin/vite.js",
+    "build": "node ../node_modules/typescript/bin/tsc -b && node ../node_modules/vite/bin/vite.js build",
+    "preview": "node ../node_modules/vite/bin/vite.js preview",
+    "test:ui": "node ../node_modules/@playwright/test/cli.js test",
+    "desktop": "npm run build && electron .",
+    "pack:win": "npm run build && electron-builder --win portable --x64",
+    "dist:win": "npm run build && electron-builder --win nsis portable --x64"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "multer": "^2.0.2",
+    "pdf-lib": "^1.17.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.2.1",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
+    "lucide-react": "^0.561.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  },
+  "build": {
+    "appId": "com.aireview.da-review-ui",
+    "productName": "DA Review UI",
+    "directories": {
+      "output": "release-final"
+    },
+    "asar": false,
+    "electronDist": "node_modules/electron/dist",
+    "files": [
+      "ai-assisted-reporting-dashboard/**/*",
+      "dist/**/*",
+      "docs/**/*",
+      "electron/**/*",
+      "scripts/**/*",
+      "server/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../../report-review-agent",
+        "to": "report-review-agent",
+        "filter": [
+          "src/**/*",
+          "package.json"
+        ]
+      },
+      {
+        "from": "../../report-review-agent/node_modules",
+        "to": "report-review-agent/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../report-review-input/excel-pdf-data",
+        "to": "workspace-seed/report-review-input/excel-pdf-data",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "projects",
+        "to": "workspace-seed/da-ui-projects",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "${productName}-${version}-${arch}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+    }
+  }
+}
