@@ -60,6 +60,7 @@ button {
 .phase-header p,
 .phase-status-stack small,
 .project-row small,
+.project-selected-edit small,
 .phase-row small,
 .artifact-item small,
 .gate-table-row small,
@@ -159,6 +160,54 @@ button {
 .artifact-list {
   display: grid;
   gap: 8px;
+}
+
+.project-picker-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.project-picker-panel select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 9px;
+  border: 1px solid #c6d0db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #18212f;
+  outline: none;
+}
+
+.project-selected-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px 32px;
+  gap: 5px;
+  align-items: stretch;
+}
+
+.project-selected-edit {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #0b6b8f;
+  border-radius: 8px;
+  background: #e9f5f8;
+}
+
+.project-selected-edit input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #18212f;
+  font-weight: 800;
+  outline: none;
+}
+
+.project-selected-edit input:focus {
+  color: #0b4f6c;
 }
 
 .project-row,
@@ -320,6 +369,12 @@ button {
 }
 
 .project-row-shell .icon-btn {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.project-selected-actions .icon-btn {
   width: 32px;
   min-height: 32px;
   padding: 0;

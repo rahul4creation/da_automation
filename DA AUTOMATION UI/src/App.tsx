@@ -372,6 +372,18 @@ export default function App() {
     [project, activePhaseId]
   );
 
+  const selectedProjectSummary = useMemo(
+    () => projects.find((item) => item.projectId === selectedProjectId) || null,
+    [projects, selectedProjectId]
+  );
+  const selectedProjectDraftName = selectedProjectSummary
+    ? projectRenameDrafts[selectedProjectSummary.projectId] ?? selectedProjectSummary.projectName
+    : "";
+  const selectedProjectRenameChanged =
+    selectedProjectSummary !== null &&
+    selectedProjectDraftName.trim().length > 0 &&
+    selectedProjectDraftName.trim() !== selectedProjectSummary.projectName;
+
   useEffect(() => {
     if (!authenticated) {
       setProjects([]);
@@ -386,6 +398,13 @@ export default function App() {
     if (!selectedProjectId) return;
     void loadProject(selectedProjectId);
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (selectedProjectId && projects.length > 0 && !projects.some((item) => item.projectId === selectedProjectId)) {
+      setSelectedProjectId("");
+      setProject(null);
+    }
+  }, [projects, selectedProjectId]);
 
   useEffect(() => {
     setQuestionAnswers(activePhase?.questionAnswers || {});
@@ -774,58 +793,66 @@ export default function App() {
             <RefreshCw size={15} />
           </button>
         </div>
-        <div className="project-list">
-          {projects.map((item) => {
-            const draftName = projectRenameDrafts[item.projectId] ?? item.projectName;
-            const changed = draftName.trim() !== item.projectName && draftName.trim().length > 0;
-            return (
-              <div className="project-row-shell" key={item.projectId}>
-                <div
-                  className={`project-row ${item.projectId === selectedProjectId ? "active" : ""}`}
-                  onClick={() => {
-                    setSelectedProjectId(item.projectId);
-                    setActivePhaseId("");
+        <div className="project-picker-panel">
+          <select
+            aria-label="Select project"
+            value={selectedProjectId}
+            onChange={(event) => {
+              const nextProjectId = event.target.value;
+              setSelectedProjectId(nextProjectId);
+              setActivePhaseId("");
+              if (!nextProjectId) setProject(null);
+            }}
+            disabled={busy || projects.length === 0}
+          >
+            <option value="">{projects.length ? "Select project" : "No projects created"}</option>
+            {projects.map((item) => (
+              <option key={item.projectId} value={item.projectId}>
+                {item.projectName} ({item.projectId})
+              </option>
+            ))}
+          </select>
+          {selectedProjectSummary && (
+            <div className="project-selected-actions">
+              <div className="project-selected-edit">
+                <input
+                  aria-label={`Rename ${selectedProjectSummary.projectName}`}
+                  onChange={(event) =>
+                    setProjectRenameDrafts((current) => ({
+                      ...current,
+                      [selectedProjectSummary.projectId]: event.target.value
+                    }))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void saveProjectRename(selectedProjectSummary);
+                    }
                   }}
-                >
-                  <input
-                    aria-label={`Rename ${item.projectName}`}
-                    onChange={(event) => setProjectRenameDrafts((current) => ({ ...current, [item.projectId]: event.target.value }))}
-                    onClick={(event) => event.stopPropagation()}
-                    onFocus={() => {
-                      setSelectedProjectId(item.projectId);
-                      setActivePhaseId("");
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void saveProjectRename(item);
-                      }
-                    }}
-                    value={draftName}
-                  />
-                  <small>{item.projectId}</small>
-                </div>
-                <button
-                  className="icon-btn"
-                  onClick={() => void saveProjectRename(item)}
-                  disabled={busy || !changed}
-                  title={`Save ${item.projectName} name`}
-                  aria-label={`Save ${item.projectName} name`}
-                >
-                  <Save size={15} />
-                </button>
-                <button
-                  className="icon-btn danger-icon"
-                  onClick={() => void moveProjectToTrash(item)}
-                  disabled={busy}
-                  title={`Move ${item.projectName} to trash`}
-                  aria-label={`Move ${item.projectName} to trash`}
-                >
-                  <Trash2 size={15} />
-                </button>
+                  value={selectedProjectDraftName}
+                />
+                <small>{selectedProjectSummary.projectId}</small>
               </div>
-            );
-          })}
+              <button
+                className="icon-btn"
+                onClick={() => void saveProjectRename(selectedProjectSummary)}
+                disabled={busy || !selectedProjectRenameChanged}
+                title={`Save ${selectedProjectSummary.projectName} name`}
+                aria-label={`Save ${selectedProjectSummary.projectName} name`}
+              >
+                <Save size={15} />
+              </button>
+              <button
+                className="icon-btn danger-icon"
+                onClick={() => void moveProjectToTrash(selectedProjectSummary)}
+                disabled={busy}
+                title={`Move ${selectedProjectSummary.projectName} to trash`}
+                aria-label={`Move ${selectedProjectSummary.projectName} to trash`}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          )}
           {projects.length === 0 && <div className="empty-note">No projects yet</div>}
         </div>
       </aside>
