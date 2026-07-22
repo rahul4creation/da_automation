@@ -3,7 +3,9 @@ param(
     [string]$MessagePrefix = "Daily DA Automation UI save",
     [string]$RemoteName = "origin",
     [string]$BranchName = "",
-    [switch]$NoPush
+    [string]$TagPrefix = "da-automation-daily",
+    [switch]$NoPush,
+    [switch]$NoTag
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +13,9 @@ $ErrorActionPreference = "Stop"
 Set-Location $RepoRoot
 
 $timestamp = Get-Date -Format "dd-MM-yyyy HH:mm:ss"
+$tagTimestamp = Get-Date -Format "yyyy-MM-dd-HH-mm-ss"
+$tagName = "${TagPrefix}-${tagTimestamp}"
+$createdTag = $false
 $logFolder = Join-Path $RepoRoot "logs"
 $logPath = Join-Path $logFolder "daily-da-automation-ui-save.log"
 
@@ -51,8 +56,14 @@ $staged = git diff --cached --name-only
 if ($staged) {
     Invoke-Git commit -m "${MessagePrefix}: $timestamp"
     Write-Log "Created commit for staged DA Automation UI changes."
+    if (-not $NoTag) {
+        Invoke-Git tag -a $tagName -m "${MessagePrefix}: $timestamp"
+        $createdTag = $true
+        Write-Log "Created rollback tag $tagName."
+    }
 } else {
     Write-Log "No staged changes to commit."
+    Write-Log "No new rollback tag created because there was no new commit."
 }
 
 if ($NoPush) {
@@ -75,3 +86,8 @@ if (-not $BranchName) {
 
 Invoke-Git push -u $RemoteName $BranchName
 Write-Log "Pushed daily version to $RemoteName/$BranchName."
+
+if ($createdTag) {
+    Invoke-Git push $RemoteName $tagName
+    Write-Log "Pushed rollback tag $tagName to $RemoteName."
+}
