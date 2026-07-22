@@ -230,6 +230,8 @@ type RepositoryFile = {
 type RepositoryResponse = {
   projectName: string;
   projectSlug: string;
+  userName?: string;
+  userFolder?: string;
   projectFolder?: string;
   folder: string;
   folderAbsolute?: string;
@@ -295,9 +297,9 @@ type CorrectionObservation = {
 };
 
 const defaultConfig: AgentConfig = {
-  checklistInput: "D:\\AIReview\\report-review-input\\excel-pdf-data\\checklist",
-  excelFolder: "D:\\AIReview\\report-review-input\\excel-pdf-data\\excel-reports",
-  pdfFolder: "D:\\AIReview\\report-review-input\\excel-pdf-data\\pdf-reports",
+  checklistInput: "",
+  excelFolder: "",
+  pdfFolder: "",
   selectedChecklistPath: "",
   selectedExcelPath: "",
   selectedExcelPaths: [],
@@ -396,12 +398,13 @@ export function ExcelPdfReviewSidebar() {
 
 type ExcelPdfReviewAppProps = {
   username: string;
+  userType?: string;
   defaultProjectName?: string;
   embedded?: boolean;
   phaseGuide?: ReactNode;
 };
 
-export default function ExcelPdfReviewApp({ username, defaultProjectName = "", embedded = false, phaseGuide }: ExcelPdfReviewAppProps) {
+export default function ExcelPdfReviewApp({ username, userType = "User", defaultProjectName = "", embedded = false, phaseGuide }: ExcelPdfReviewAppProps) {
   const [config, setConfig] = useState<AgentConfig>(() => ({
     ...defaultConfig,
     projectName: defaultProjectName,
@@ -557,7 +560,9 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     runError
   });
   const repositoryFolder =
-    repository?.folderAbsolute || `D:\\AIReview\\project\\${projectFolderPreview(config.projectName || "excel-pdf-data-review")}`;
+    repository?.folderAbsolute
+    || `D:\\AIReview\\project\\${projectFolderPreview(username || "unknown-user")}\\${projectFolderPreview(config.projectName || "excel-pdf-data-review")}`;
+  const showServerInputPaths = isAdminSession(username, userType);
   const generatedFiles = generatedReviewFiles(runResult, repository);
   const checklistGridColumns = checklistGrid?.columns?.length ? checklistGrid.columns : ["S.NO", "Check Points"];
   const checklistGridRows = checklistGrid?.rows || [];
@@ -566,6 +571,44 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
   const checklistGridTemplate = {
     "--editor-columns": `54px repeat(${checklistGridColumns.length}, minmax(150px, 1fr)) 38px`
   } as CSSProperties;
+
+  function actorQuery() {
+    return `actorUserName=${encodeURIComponent(username)}&actorUserType=${encodeURIComponent(userType)}`;
+  }
+
+  function withActorQuery(url: string) {
+    return `${url}${url.includes("?") ? "&" : "?"}${actorQuery()}`;
+  }
+
+  function withActorBody<T extends Record<string, unknown>>(body: T): T & { actorUserName: string; actorUserType: string } {
+    return {
+      ...body,
+      actorUserName: username,
+      actorUserType: userType
+    };
+  }
+
+  function appendActorFields(formData: FormData) {
+    formData.append("actorUserName", username);
+    formData.append("actorUserType", userType);
+  }
+
+  function repositoryFileUrl(filePath: string, inline = false) {
+    const params = new URLSearchParams({
+      path: filePath,
+      actorUserName: username,
+      actorUserType: userType
+    });
+    if (inline) params.set("inline", "1");
+    return `/api/excel-pdf-data/repository/download?${params.toString()}`;
+  }
+
+  function reviewInputLocationLabel(pathValue: string, label: string) {
+    if (showServerInputPaths) return pathValue || "-";
+    return pathValue
+      ? `${label} uploaded from this login user's browser.`
+      : `Use Browse to select ${label.toLowerCase()} from this login user's system.`;
+  }
 
   function clearReviewOutput() {
     setRunResult(null);
@@ -625,7 +668,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
   async function loadDefaults() {
     try {
       setLoadingInputs(true);
-      const result = await apiGet<DefaultsResponse>("/api/excel-pdf-data/defaults");
+      const result = await apiGet<DefaultsResponse>(withActorQuery("/api/excel-pdf-data/defaults"));
       setConfig((current) => ({
         ...current,
         ...result.config,
@@ -651,7 +694,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     try {
       setLoadingInputs(true);
       clearReviewOutput();
-      const result = await apiPost<DefaultsResponse>("/api/excel-pdf-data/discover", config);
+      const result = await apiPost<DefaultsResponse>("/api/excel-pdf-data/discover", withActorBody(config));
       setConfig((current) => ({
         ...current,
         ...result.config,
@@ -681,7 +724,9 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
       return;
     }
     try {
-      const result = await apiGet<ChecklistSheetsResponse>(`/api/excel-pdf-data/checklist/sheets?path=${encodeURIComponent(checklistPath)}`);
+      const result = await apiGet<ChecklistSheetsResponse>(
+        withActorQuery(`/api/excel-pdf-data/checklist/sheets?path=${encodeURIComponent(checklistPath)}`)
+      );
       if (requestId !== checklistSheetsRequestRef.current) return;
       const sheets = result.sheets || [];
       setChecklistSheets(sheets);
@@ -699,7 +744,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     try {
       setLoadingChecklistGrid(true);
       const result = await apiGet<ChecklistSheetGridResponse>(
-        `/api/excel-pdf-data/checklist/sheet?path=${encodeURIComponent(checklistPath)}&sheetName=${encodeURIComponent(sheetName)}`
+        withActorQuery(`/api/excel-pdf-data/checklist/sheet?path=${encodeURIComponent(checklistPath)}&sheetName=${encodeURIComponent(sheetName)}`)
       );
       if (requestId !== checklistGridRequestRef.current) return;
       setChecklistGrid({
@@ -785,13 +830,13 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     try {
       setSavingChecklistRevision(true);
       setChecklistRevisionStatus("");
-      const result = await apiPost<ChecklistRevisionResponse>("/api/excel-pdf-data/checklist/revision/edit", {
+      const result = await apiPost<ChecklistRevisionResponse>("/api/excel-pdf-data/checklist/revision/edit", withActorBody({
         ...config,
         checklistInput: editorChecklistInput || config.checklistInput,
         selectedChecklistPath: editorChecklistPath,
         sheetName,
         rows: editableRows
-      });
+      }));
       setEditorChecklists(result.files.checklists);
       setEditorChecklistPath(result.createdFile.path);
       setEditorChecklistInput(parentFolderFromPath(result.createdFile.path));
@@ -864,6 +909,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     if (!selectedFiles.length) return;
 
     const formData = new FormData();
+    appendActorFields(formData);
     formData.append("projectName", config.projectName || "excel-pdf-data-review");
     selectedFiles.forEach((file) => formData.append("files", file));
 
@@ -880,7 +926,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     }
 
     try {
-      const result = await apiPost<ReviewInputUploadResult>(`/api/excel-pdf-data/upload/${kind}`, formData);
+      const result = await apiPost<ReviewInputUploadResult>(withActorQuery(`/api/excel-pdf-data/upload/${kind}`), formData);
       setDiscovery((current) => {
         if (kind === "checklist") {
           return {
@@ -958,6 +1004,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     if (!selectedFiles.length) return;
 
     const formData = new FormData();
+    appendActorFields(formData);
     formData.append("projectName", config.projectName || "excel-pdf-data-review");
     formData.append("files", selectedFiles[0]);
 
@@ -972,7 +1019,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     setChecklistRevisionStatus("");
 
     try {
-      const result = await apiPost<ReviewInputUploadResult>("/api/excel-pdf-data/upload/checklist", formData);
+      const result = await apiPost<ReviewInputUploadResult>(withActorQuery("/api/excel-pdf-data/upload/checklist"), formData);
       setEditorChecklists(result.files);
       setEditorChecklistPath(result.selectedPaths[0] || "");
       setEditorChecklistInput(result.folder);
@@ -994,7 +1041,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     setPreviewFile(null);
     setShowSuccessPopup(false);
     try {
-      const result = await apiPost<AgentRunResult>("/api/excel-pdf-data/run", { ...config, userName: username });
+      const result = await apiPost<AgentRunResult>("/api/excel-pdf-data/run", withActorBody({ ...config, userName: username }));
       setRunResult(result);
       if (result.files) setDiscovery(result.files);
       setReviewStatus("complete");
@@ -1015,7 +1062,9 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     }
     try {
       setRepositoryLoading(true);
-      const result = await apiGet<RepositoryResponse>(`/api/excel-pdf-data/repository?projectName=${encodeURIComponent(name)}`);
+      const result = await apiGet<RepositoryResponse>(
+        withActorQuery(`/api/excel-pdf-data/repository?projectName=${encodeURIComponent(name)}&userName=${encodeURIComponent(username)}`)
+      );
       setRepository(result);
       await loadReviewSummary(name);
       return result;
@@ -1034,7 +1083,9 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
       return null;
     }
     try {
-      const result = await apiGet<ReviewSummary>(`/api/excel-pdf-data/repository/summary?projectName=${encodeURIComponent(name)}`);
+      const result = await apiGet<ReviewSummary>(
+        withActorQuery(`/api/excel-pdf-data/repository/summary?projectName=${encodeURIComponent(name)}&userName=${encodeURIComponent(username)}`)
+      );
       setReviewSummary(result);
       setSummaryToggles((current) => {
         const next = { ...current };
@@ -1054,7 +1105,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
     if (!file.canView) return;
     try {
       setPreviewLoadingPath(file.path);
-      const result = await apiGet<PreviewFile>(`/api/excel-pdf-data/repository/view?path=${encodeURIComponent(file.path)}`);
+      const result = await apiGet<PreviewFile>(withActorQuery(`/api/excel-pdf-data/repository/view?path=${encodeURIComponent(file.path)}`));
       setPreviewFile(result);
     } catch (error) {
       setRunError(error instanceof Error ? error.message : "Could not open review file.");
@@ -1228,8 +1279,8 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
                       />
                     </label>
                   </div>
-                  <small>{config.checklistInput}</small>
-                  <small>Browse a checklist workbook for this review run.</small>
+                  <small>{reviewInputLocationLabel(config.checklistInput, "Checklist")}</small>
+                  <small>Browse opens this login user's system and uploads the selected checklist for this review run.</small>
                 </div>
                 <div className="path-field form-field">
                   <span>Excel Report Selection</span>
@@ -1255,8 +1306,8 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
                       />
                     </label>
                   </div>
-                  <small>{config.excelFolder}</small>
-                  <small>Browse one or more Excel design workbooks. The selected file(s) will be used for this review run.</small>
+                  <small>{reviewInputLocationLabel(config.excelFolder, "Excel reports")}</small>
+                  <small>Browse opens this login user's system and uploads the selected Excel file(s) for this review run.</small>
                 </div>
                 <button className="primary-btn agent-input-run" onClick={runReview} disabled={!readiness || loadingInputs || reviewStatus === "running" || Boolean(uploadingInputKind)}>
                   {reviewStatus === "running" ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
@@ -1304,7 +1355,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
                   />
                 </label>
               </div>
-              <small>{editorChecklistInput || config.checklistInput}</small>
+              <small>{reviewInputLocationLabel(editorChecklistInput || config.checklistInput, "Checklist")}</small>
             </div>
             <label className="latest-checklist-option">
               <input
@@ -1496,7 +1547,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
                       {file.extension === ".pdf" ? (
                         <a
                           className="icon-action"
-                          href={`/api/excel-pdf-data/repository/download?inline=1&path=${encodeURIComponent(file.path)}`}
+                          href={repositoryFileUrl(file.path, true)}
                           target="_blank"
                           rel="noreferrer"
                           title={`Open ${file.displayName || file.name}`}
@@ -1516,7 +1567,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
                       )}
                       <a
                         className="icon-action"
-                        href={`/api/excel-pdf-data/repository/download?path=${encodeURIComponent(file.path)}`}
+                        href={repositoryFileUrl(file.path)}
                         title={`Download ${file.displayName || file.name}`}
                       >
                         <Download size={15} />
@@ -1581,7 +1632,7 @@ export default function ExcelPdfReviewApp({ username, defaultProjectName = "", e
             </div>
             <pre>{previewFile.content}</pre>
             <div className="preview-actions">
-              <a className="secondary-btn" href={`/api/excel-pdf-data/repository/download?path=${encodeURIComponent(previewFile.path)}`}>
+              <a className="secondary-btn" href={repositoryFileUrl(previewFile.path)}>
                 <Download size={16} />
                 Download
               </a>
@@ -1945,6 +1996,10 @@ function projectFolderPreview(value: string) {
     .trim()
     .replace(/[. ]+$/g, "")
     .slice(0, 120) || "excel-pdf-data-review";
+}
+
+function isAdminSession(username: string, userType: string) {
+  return username.trim().toLowerCase() === "rahul_raj" || userType.trim().toLowerCase() === "admin";
 }
 
 function formatTimestamp(value: Date) {

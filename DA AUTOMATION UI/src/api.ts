@@ -51,6 +51,8 @@ export type ProjectSummary = {
   projectId: string;
   projectName: string;
   owner: string;
+  ownerUserName?: string;
+  createdByUserName?: string;
   status: string;
   currentPhaseId: string;
   targetPlatform: string;

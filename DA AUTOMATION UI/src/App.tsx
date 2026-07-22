@@ -38,6 +38,7 @@ const statusOptions = ["Complete", "Incomplete", "Blocked", "Not applicable"] as
 const validLogin = { username: "Rahul_Raj", password: "Alpha1" };
 const authKey = "da-review-ai-ui-authenticated";
 const authUsernameKey = "da-review-ai-ui-username";
+const authUserTypeKey = "da-review-ai-ui-user-type";
 const lastUsernameKey = "da-review-ai-ui-last-username";
 const defaultReviewPhaseId = "05-ai-review-validation";
 
@@ -340,6 +341,9 @@ export default function App() {
     () => sessionStorage.getItem(authUsernameKey) || localStorage.getItem(lastUsernameKey) || validLogin.username
   );
   const [currentUsername, setCurrentUsername] = useState(() => sessionStorage.getItem(authUsernameKey) || lastUsername);
+  const [currentUserType, setCurrentUserType] = useState(
+    () => sessionStorage.getItem(authUserTypeKey) || (currentUsername.toLowerCase() === validLogin.username.toLowerCase() ? "Admin" : "User")
+  );
   const [loginError, setLoginError] = useState("");
   const [phaseDefs, setPhaseDefs] = useState<PhaseDefinition[]>([]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -369,8 +373,14 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (!authenticated) {
+      setProjects([]);
+      setSelectedProjectId("");
+      setProject(null);
+      return;
+    }
     void bootstrap();
-  }, []);
+  }, [authenticated, currentUsername, currentUserType]);
 
   useEffect(() => {
     if (!selectedProjectId) return;
@@ -391,11 +401,32 @@ export default function App() {
     scrollToSection("gate-checklist");
   }
 
+  function actorQuery() {
+    return `actorUserName=${encodeURIComponent(currentUsername)}&actorUserType=${encodeURIComponent(currentUserType)}`;
+  }
+
+  function withActorQuery(url: string) {
+    return `${url}${url.includes("?") ? "&" : "?"}${actorQuery()}`;
+  }
+
+  function withActorBody<T extends Record<string, unknown>>(body: T): T & { actorUserName: string; actorUserType: string } {
+    return {
+      ...body,
+      actorUserName: currentUsername,
+      actorUserType: currentUserType
+    };
+  }
+
+  function appendActorFields(formData: FormData) {
+    formData.append("actorUserName", currentUsername);
+    formData.append("actorUserType", currentUserType);
+  }
+
   async function bootstrap() {
     try {
       const [{ phases }, { projects: loadedProjects }] = await Promise.all([
         apiGet<{ phases: PhaseDefinition[] }>("/api/phases"),
-        apiGet<{ projects: ProjectSummary[] }>("/api/projects")
+        apiGet<{ projects: ProjectSummary[] }>(withActorQuery("/api/projects"))
       ]);
       setPhaseDefs(phases);
       setProjects(loadedProjects);
@@ -405,13 +436,13 @@ export default function App() {
   }
 
   async function refreshProjects() {
-    const { projects: loadedProjects } = await apiGet<{ projects: ProjectSummary[] }>("/api/projects");
+    const { projects: loadedProjects } = await apiGet<{ projects: ProjectSummary[] }>(withActorQuery("/api/projects"));
     setProjects(loadedProjects);
   }
 
   async function loadProject(projectId: string) {
     try {
-      const { project: loadedProject } = await apiGet<{ project: ProjectDetail }>(`/api/projects/${projectId}`);
+      const { project: loadedProject } = await apiGet<{ project: ProjectDetail }>(withActorQuery(`/api/projects/${projectId}`));
       setProject(loadedProject);
       setActivePhaseId(loadedProject.phases.find((phase) => phase.id === defaultReviewPhaseId)?.id || loadedProject.currentPhaseId || loadedProject.phases[0]?.id || "");
     } catch (error) {
@@ -422,7 +453,7 @@ export default function App() {
   async function createProject() {
     try {
       setBusy(true);
-      const { project: created } = await apiPost<{ project: ProjectDetail }>("/api/projects", createForm);
+      const { project: created } = await apiPost<{ project: ProjectDetail }>("/api/projects", withActorBody(createForm));
       setCreateForm({ projectName: "", projectId: "", owner: "", targetPlatform: "" });
       await refreshProjects();
       setProject(created);
@@ -442,7 +473,7 @@ export default function App() {
       setBusy(true);
       const result = await apiPost<{ output: string }>(
         `/api/projects/${project.projectId}/phases/${activePhase.id}/run`,
-        { notes, questionAnswers }
+        withActorBody({ notes, questionAnswers })
       );
       setToast({ type: "success", message: "Agent output generated" });
       setNotes("");
@@ -462,7 +493,7 @@ export default function App() {
     if (!project || !activePhase) return;
     try {
       setBusy(true);
-      await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/gate`, { gate });
+      await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/gate`, withActorBody({ gate }));
       setToast({ type: "success", message: "Gate saved" });
       await loadProject(project.projectId);
     } catch (error) {
@@ -476,7 +507,7 @@ export default function App() {
     if (!project || !activePhase) return;
     try {
       setBusy(true);
-      await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/questions`, { questionAnswers });
+      await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/questions`, withActorBody({ questionAnswers }));
       setToast({ type: "success", message: "Guided answers saved" });
       await loadProject(project.projectId);
     } catch (error) {
@@ -490,10 +521,12 @@ export default function App() {
     if (!project || !activePhase) return;
     try {
       setBusy(true);
-      await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/questions`, { questionAnswers });
+      await apiPut(`/api/projects/${project.projectId}/phases/${activePhase.id}/questions`, withActorBody({ questionAnswers }));
       await apiPost(`/api/projects/${project.projectId}/phases/${activePhase.id}/run`, {
         notes,
-        questionAnswers
+        questionAnswers,
+        actorUserName: currentUsername,
+        actorUserType: currentUserType
       });
       setToast({ type: "success", message: "Artifact generated from guided answers" });
       setNotes("");
@@ -513,7 +546,8 @@ export default function App() {
     try {
       setBusy(true);
       const { project: updated, nextPhaseId } = await apiPost<{ project: ProjectDetail; nextPhaseId: string | null }>(
-        `/api/projects/${project.projectId}/phases/${activePhase.id}/complete`
+        `/api/projects/${project.projectId}/phases/${activePhase.id}/complete`,
+        withActorBody({})
       );
       setProject(updated);
       setActivePhaseId(nextPhaseId || activePhase.id);
@@ -531,7 +565,7 @@ export default function App() {
     if (!projectName || projectName === item.projectName) return;
     try {
       setBusy(true);
-      const { project: updated } = await apiPut<{ project: ProjectDetail }>(`/api/projects/${item.projectId}`, { projectName });
+      const { project: updated } = await apiPut<{ project: ProjectDetail }>(`/api/projects/${item.projectId}`, withActorBody({ projectName }));
       setProjects((current) =>
         current
           .map((projectItem) => (projectItem.projectId === item.projectId ? { ...projectItem, projectName: updated.projectName } : projectItem))
@@ -555,7 +589,10 @@ export default function App() {
     if (!title || title === phase.title) return;
     try {
       setBusy(true);
-      const { project: updated } = await apiPut<{ project: ProjectDetail }>(`/api/projects/${project.projectId}/phases/${phase.id}`, { title });
+      const { project: updated } = await apiPut<{ project: ProjectDetail }>(
+        `/api/projects/${project.projectId}/phases/${phase.id}`,
+        withActorBody({ title })
+      );
       setProject(updated);
       setPhaseRenameDrafts((current) => ({ ...current, [phase.id]: title }));
       await refreshProjects();
@@ -575,7 +612,7 @@ export default function App() {
 
     try {
       setBusy(true);
-      const result = await apiDelete<{ trashPath: string }>(`/api/projects/${item.projectId}`);
+      const result = await apiDelete<{ trashPath: string }>(withActorQuery(`/api/projects/${item.projectId}`));
       if (selectedProjectId === item.projectId) {
         setSelectedProjectId("");
         setProject(null);
@@ -595,14 +632,17 @@ export default function App() {
   async function uploadFiles(files: FileList | null) {
     if (!project || !activePhase || !files?.length) return;
     const formData = new FormData();
+    appendActorFields(formData);
     Array.from(files).forEach((file) => formData.append("files", file));
     try {
       setBusy(true);
-      await apiPost(`/api/projects/${project.projectId}/phases/${activePhase.id}/uploads`, formData);
+      await apiPost(withActorQuery(`/api/projects/${project.projectId}/phases/${activePhase.id}/uploads`), formData);
       setToast({ type: "info", message: `${files.length} artifact(s) uploaded. Running agent...` });
       await apiPost(`/api/projects/${project.projectId}/phases/${activePhase.id}/run`, {
         notes: notes || "Analyze newly uploaded artifact(s).",
-        questionAnswers
+        questionAnswers,
+        actorUserName: currentUsername,
+        actorUserType: currentUserType
       });
       setToast({ type: "success", message: `${files.length} artifact(s) uploaded and analyzed` });
       await loadProject(project.projectId);
@@ -624,11 +664,14 @@ export default function App() {
     try {
       const result = await apiPost<LoginResult>("/api/auth/login", { username, password });
       const signedInUsername = result.username || username;
+      const signedInUserType = result.userType || (signedInUsername.toLowerCase() === validLogin.username.toLowerCase() ? "Admin" : "User");
       sessionStorage.setItem(authKey, "true");
       sessionStorage.setItem(authUsernameKey, signedInUsername);
+      sessionStorage.setItem(authUserTypeKey, signedInUserType);
       localStorage.setItem(lastUsernameKey, signedInUsername);
       setLastUsername(signedInUsername);
       setCurrentUsername(signedInUsername);
+      setCurrentUserType(signedInUserType);
       setAuthenticated(true);
       setLoginError("");
       return;
@@ -657,8 +700,10 @@ export default function App() {
   function logout() {
     sessionStorage.removeItem(authKey);
     sessionStorage.removeItem(authUsernameKey);
+    sessionStorage.removeItem(authUserTypeKey);
     setAuthenticated(false);
     setCurrentUsername(lastUsername);
+    setCurrentUserType(lastUsername.toLowerCase() === validLogin.username.toLowerCase() ? "Admin" : "User");
     setLoginError("");
   }
 
@@ -819,6 +864,7 @@ export default function App() {
                     defaultProjectName={project.projectName || project.projectId}
                     phaseGuide={<PhaseGuide phase={activePhase} />}
                     username={currentUsername}
+                    userType={currentUserType}
                   />
                 </>
               ) : (

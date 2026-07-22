@@ -17,6 +17,7 @@ const AI_REVIEW_ROOT = path.resolve(process.env.DA_AI_REVIEW_ROOT || process.env
 const PROJECTS_ROOT = path.resolve(process.env.DA_PROJECTS_ROOT || path.join(ROOT, "projects"));
 const SKILL_ROOT = path.resolve(process.env.DA_SKILL_ROOT || path.join(ROOT, "ai-assisted-reporting-dashboard"));
 const DIST_ROOT = path.resolve(process.env.DA_UI_DIST_ROOT || path.join(ROOT, "dist"));
+const BROWSER_REVIEW_INPUT_ROOT = path.join(ROOT, "tmp", "excel-pdf-browser-inputs");
 const EXCEL_PREVIEW_SCRIPT = path.join(ROOT, "scripts", "excel-preview.py");
 const EXCEL_PDF_AGENT_DIR = path.resolve(process.env.DA_EXCEL_PDF_AGENT_DIR || path.join(AI_REVIEW_ROOT, "report-review-agent"));
 const EXCEL_PDF_AGENT_SCRIPT = path.join(EXCEL_PDF_AGENT_DIR, "src", "excelPdfDataReviewAgent.mjs");
@@ -347,6 +348,9 @@ const upload = multer({
       try {
         const project = assertProjectId(req.params.projectId);
         const phase = assertPhaseId(req.params.phaseId);
+        const actor = await requestActor(req);
+        const state = await readProjectState(project);
+        assertProjectAccess(state, actor);
         const uploadDir = path.join(PROJECTS_ROOT, project, "phases", phase, "uploads");
         await ensureDir(uploadDir);
         cb(null, uploadDir);
@@ -370,10 +374,11 @@ const reviewInputUpload = multer({
     destination: async (req, file, cb) => {
       try {
         const kind = assertReviewInputUploadKind(req.params.kind);
+        const actor = await requestActor(req);
         const projectSlug = slugify(req.body.projectName || "browser-selection") || "browser-selection";
         const uploadId = req.reviewInputUploadId || `${timestamp()}-${Math.random().toString(16).slice(2)}`;
         req.reviewInputUploadId = uploadId;
-        const uploadDir = path.join(ROOT, "tmp", "excel-pdf-browser-inputs", `${projectSlug}-${uploadId}`, kind);
+        const uploadDir = path.join(BROWSER_REVIEW_INPUT_ROOT, userReviewFolderName(actor.username), `${projectSlug}-${uploadId}`, kind);
         req.reviewInputUploadDir = uploadDir;
         await ensureDir(uploadDir);
         cb(null, uploadDir);
@@ -462,10 +467,12 @@ app.get("/api/phases", (req, res) => {
 
 app.get("/api/excel-pdf-data/defaults", async (req, res, next) => {
   try {
+    const actor = await requestActor(req);
     const config = normalizeExcelPdfDataOptions({});
+    const visibleConfig = excelPdfConfigForActor(config, actor);
     res.json({
-      config,
-      files: await discoverExcelPdfDataInputs(config)
+      config: visibleConfig,
+      files: await discoverExcelPdfDataInputs(visibleConfig)
     });
   } catch (error) {
     next(error);
@@ -474,10 +481,12 @@ app.get("/api/excel-pdf-data/defaults", async (req, res, next) => {
 
 app.post("/api/excel-pdf-data/discover", async (req, res, next) => {
   try {
+    const actor = await requestActor(req);
     const config = normalizeExcelPdfDataOptions(req.body || {});
+    const visibleConfig = excelPdfConfigForActor(config, actor);
     res.json({
-      config,
-      files: await discoverExcelPdfDataInputs(config)
+      config: visibleConfig,
+      files: await discoverExcelPdfDataInputs(visibleConfig)
     });
   } catch (error) {
     next(error);
@@ -513,7 +522,8 @@ app.post("/api/excel-pdf-data/upload/:kind", reviewInputUpload.array("files", 50
 
 app.get("/api/excel-pdf-data/checklist/sheets", async (req, res, next) => {
   try {
-    const workbookPath = await resolveChecklistWorkbook(req.query.path);
+    const actor = await requestActor(req);
+    const workbookPath = await resolveChecklistWorkbook(req.query.path, actor);
     res.json(await runChecklistRevisionCommand("inspect", [workbookPath], () => inspectChecklistWorkbook(workbookPath)));
   } catch (error) {
     next(error);
@@ -522,7 +532,8 @@ app.get("/api/excel-pdf-data/checklist/sheets", async (req, res, next) => {
 
 app.get("/api/excel-pdf-data/checklist/sheet", async (req, res, next) => {
   try {
-    const workbookPath = await resolveChecklistWorkbook(req.query.path);
+    const actor = await requestActor(req);
+    const workbookPath = await resolveChecklistWorkbook(req.query.path, actor);
     const sheetName = String(req.query.sheetName || "").trim();
     if (!sheetName) {
       const error = new Error("Checklist sheet name is required.");
@@ -537,8 +548,9 @@ app.get("/api/excel-pdf-data/checklist/sheet", async (req, res, next) => {
 
 app.post("/api/excel-pdf-data/checklist/revision", async (req, res, next) => {
   try {
+    const actor = await requestActor(req);
     const config = normalizeExcelPdfDataOptions(req.body || {});
-    const sourcePath = await resolveChecklistWorkbook(req.body?.selectedChecklistPath || req.body?.checklistPath || config.selectedChecklistPath);
+    const sourcePath = await resolveChecklistWorkbook(req.body?.selectedChecklistPath || req.body?.checklistPath || config.selectedChecklistPath, actor);
     const sheetName = String(req.body?.sheetName || "").trim();
     const points = normalizeChecklistPoints(req.body?.points || req.body?.pointsText);
     if (!sheetName) {
@@ -562,11 +574,11 @@ app.post("/api/excel-pdf-data/checklist/revision", async (req, res, next) => {
     const stat = await fsp.stat(nextRevision.outputPath);
     const createdFile = withChecklistRevision(toReviewFile(nextRevision.outputPath, "Checklist", stat));
     const checklistInput = isChecklistWorkbook(config.checklistInput) ? path.dirname(sourcePath) : config.checklistInput;
-    const files = await discoverExcelPdfDataInputs({
+    const files = await discoverExcelPdfDataInputsForActor({
       ...config,
       checklistInput,
       selectedChecklistPath: nextRevision.outputPath
-    });
+    }, actor);
     res.json({
       ok: true,
       revisionLabel: nextRevision.revisionLabel,
@@ -581,8 +593,9 @@ app.post("/api/excel-pdf-data/checklist/revision", async (req, res, next) => {
 
 app.post("/api/excel-pdf-data/checklist/revision/edit", async (req, res, next) => {
   try {
+    const actor = await requestActor(req);
     const config = normalizeExcelPdfDataOptions(req.body || {});
-    const sourcePath = await resolveChecklistWorkbook(req.body?.selectedChecklistPath || req.body?.checklistPath || config.selectedChecklistPath);
+    const sourcePath = await resolveChecklistWorkbook(req.body?.selectedChecklistPath || req.body?.checklistPath || config.selectedChecklistPath, actor);
     const sheetName = String(req.body?.sheetName || "").trim();
     const rows = normalizeChecklistGridRows(req.body?.rows || []);
     if (!sheetName) {
@@ -606,11 +619,11 @@ app.post("/api/excel-pdf-data/checklist/revision/edit", async (req, res, next) =
     const stat = await fsp.stat(nextRevision.outputPath);
     const createdFile = withChecklistRevision(toReviewFile(nextRevision.outputPath, "Checklist", stat));
     const checklistInput = isChecklistWorkbook(config.checklistInput) ? path.dirname(sourcePath) : config.checklistInput;
-    const files = await discoverExcelPdfDataInputs({
+    const files = await discoverExcelPdfDataInputsForActor({
       ...config,
       checklistInput,
       selectedChecklistPath: nextRevision.outputPath
-    });
+    }, actor);
     res.json({
       ok: true,
       revisionLabel: nextRevision.revisionLabel,
@@ -625,8 +638,10 @@ app.post("/api/excel-pdf-data/checklist/revision/edit", async (req, res, next) =
 
 app.get("/api/excel-pdf-data/repository", async (req, res, next) => {
   try {
+    const actor = await requestActor(req);
     const projectName = String(req.query.projectName || "").trim();
-    res.json(await listExcelPdfProjectRepository(projectName));
+    const userName = String(req.query.userName || "").trim();
+    res.json(await listExcelPdfProjectRepository(projectName, userName, actor));
   } catch (error) {
     next(error);
   }
@@ -634,7 +649,8 @@ app.get("/api/excel-pdf-data/repository", async (req, res, next) => {
 
 app.get("/api/excel-pdf-data/repository/view", async (req, res, next) => {
   try {
-    const filePath = resolveRepositoryFile(req.query.path);
+    const actor = await requestActor(req);
+    const filePath = resolveRepositoryFile(req.query.path, actor);
     const extension = path.extname(filePath).toLowerCase();
     if (![".md", ".txt"].includes(extension)) {
       const error = new Error("Only Markdown and text review files can be previewed in the browser.");
@@ -655,13 +671,15 @@ app.get("/api/excel-pdf-data/repository/view", async (req, res, next) => {
 
 app.get("/api/excel-pdf-data/repository/summary", async (req, res, next) => {
   try {
+    const actor = await requestActor(req);
     const requestedPath = String(req.query.path || "").trim();
     let filePath = "";
     if (requestedPath) {
-      filePath = resolveRepositoryFile(requestedPath);
+      filePath = resolveRepositoryFile(requestedPath, actor);
     } else {
       const projectName = String(req.query.projectName || "").trim();
-      filePath = await latestExcelPdfResultJsonPath(projectName);
+      const userName = String(req.query.userName || "").trim();
+      filePath = await latestExcelPdfResultJsonPath(projectName, userName, actor);
     }
     const payload = JSON.parse(await fsp.readFile(filePath, "utf8"));
     res.json(buildExcelPdfReviewSummary(payload, relativePath(AI_REVIEW_ROOT, filePath)));
@@ -670,9 +688,10 @@ app.get("/api/excel-pdf-data/repository/summary", async (req, res, next) => {
   }
 });
 
-app.get("/api/excel-pdf-data/repository/download", (req, res, next) => {
+app.get("/api/excel-pdf-data/repository/download", async (req, res, next) => {
   try {
-    const filePath = resolveRepositoryFile(req.query.path);
+    const actor = await requestActor(req);
+    const filePath = resolveRepositoryFile(req.query.path, actor);
     const inline = String(req.query.inline || "") === "1";
     if (inline && path.extname(filePath).toLowerCase() === ".pdf") {
       res.setHeader("Content-Type", "application/pdf");
@@ -687,8 +706,11 @@ app.get("/api/excel-pdf-data/repository/download", (req, res, next) => {
 
 app.post("/api/excel-pdf-data/run", async (req, res) => {
   try {
+    const actor = await requestActor(req);
     const config = normalizeExcelPdfDataOptions(req.body || {});
-    const files = await discoverExcelPdfDataInputs(config);
+    if (!actor.isAdmin) config.userName = actor.username;
+    if (actor.isAdmin && !config.userName) config.userName = actor.username;
+    const files = await discoverExcelPdfDataInputsForActor(config, actor);
     const startedAt = new Date().toISOString();
     if (config.excelOnly) {
       const excelOnlyResult = await runExcelOnlyDataDesignReview(config, files, startedAt);
@@ -759,12 +781,14 @@ app.post("/api/excel-pdf-data/run", async (req, res) => {
 
 app.get("/api/projects", async (req, res, next) => {
   try {
+    const actor = await requestActor(req);
     await ensureDir(PROJECTS_ROOT);
     const entries = await fsp.readdir(PROJECTS_ROOT, { withFileTypes: true });
     const projects = [];
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith("_")) continue;
       const state = await readProjectState(entry.name);
+      if (!canAccessProject(state, actor)) continue;
       projects.push(toProjectSummary(state));
     }
     projects.sort((a, b) => a.projectName.localeCompare(b.projectName));
@@ -776,16 +800,17 @@ app.get("/api/projects", async (req, res, next) => {
 
 app.post("/api/projects", async (req, res, next) => {
   try {
+    const actor = await requestActor(req);
     const projectId = assertProjectId(req.body.projectId || slugify(req.body.projectName || ""));
     const projectName = String(req.body.projectName || projectId).trim();
-    const owner = String(req.body.owner || "").trim();
+    const owner = String(req.body.owner || "").trim() || actor.username;
     const targetPlatform = String(req.body.targetPlatform || "").trim();
     const projectRoot = projectPath(projectId);
     if (fs.existsSync(projectRoot)) {
       return res.status(409).json({ error: "Project already exists." });
     }
 
-    await createProjectWorkspace({ projectId, projectName, owner, targetPlatform });
+    await createProjectWorkspace({ projectId, projectName, owner, targetPlatform, ownerUserName: actor.username, createdByUserName: actor.username });
     const state = await readProjectState(projectId);
     res.status(201).json({ project: await buildProjectDetail(state) });
   } catch (error) {
@@ -796,7 +821,7 @@ app.post("/api/projects", async (req, res, next) => {
 app.get("/api/projects/:projectId", async (req, res, next) => {
   try {
     const projectId = assertProjectId(req.params.projectId);
-    const state = await readProjectState(projectId);
+    const { state } = await readAuthorizedProjectState(projectId, req);
     const project = await buildProjectDetail(state);
     res.json({ project });
   } catch (error) {
@@ -807,7 +832,7 @@ app.get("/api/projects/:projectId", async (req, res, next) => {
 app.put("/api/projects/:projectId", async (req, res, next) => {
   try {
     const projectId = assertProjectId(req.params.projectId);
-    const state = await readProjectState(projectId);
+    const { state } = await readAuthorizedProjectState(projectId, req);
     const projectName = String(req.body.projectName || "").trim();
     if (!projectName) {
       const error = new Error("Project name is required.");
@@ -827,7 +852,8 @@ app.put("/api/projects/:projectId", async (req, res, next) => {
 app.delete("/api/projects/:projectId", async (req, res, next) => {
   try {
     const projectId = assertProjectId(req.params.projectId);
-    const result = await moveProjectToTrash(projectId);
+    const { actor } = await readAuthorizedProjectState(projectId, req);
+    const result = await moveProjectToTrash(projectId, actor);
     res.json(result);
   } catch (error) {
     next(error);
@@ -838,7 +864,7 @@ app.get("/api/projects/:projectId/phases/:phaseId", async (req, res, next) => {
   try {
     const projectId = assertProjectId(req.params.projectId);
     const phaseId = assertPhaseId(req.params.phaseId);
-    const state = await readProjectState(projectId);
+    const { state } = await readAuthorizedProjectState(projectId, req);
     const phase = await buildPhaseDetail(state, phaseId);
     res.json({ phase });
   } catch (error) {
@@ -856,7 +882,7 @@ app.put("/api/projects/:projectId/phases/:phaseId", async (req, res, next) => {
       error.statusCode = 400;
       throw error;
     }
-    const state = await readProjectState(projectId);
+    const { state } = await readAuthorizedProjectState(projectId, req);
     state.phases[phaseId] = {
       ...(state.phases[phaseId] || {}),
       title: phaseTitle,
@@ -875,6 +901,7 @@ app.post("/api/projects/:projectId/phases/:phaseId/uploads", upload.array("files
   try {
     const projectId = assertProjectId(req.params.projectId);
     const phaseId = assertPhaseId(req.params.phaseId);
+    await readAuthorizedProjectState(projectId, req);
     const files = req.files || [];
     const manifest = await appendUploadManifest(projectId, phaseId, files);
     res.json({ uploaded: files.length, files: manifest });
@@ -887,6 +914,7 @@ app.put("/api/projects/:projectId/phases/:phaseId/gate", async (req, res, next) 
   try {
     const projectId = assertProjectId(req.params.projectId);
     const phaseId = assertPhaseId(req.params.phaseId);
+    await readAuthorizedProjectState(projectId, req);
     const gate = normalizeGatePayload(req.body.gate);
     await writeJson(phasePath(projectId, phaseId, "gate-status.json"), gate);
     res.json({ gate });
@@ -899,6 +927,7 @@ app.put("/api/projects/:projectId/phases/:phaseId/questions", async (req, res, n
   try {
     const projectId = assertProjectId(req.params.projectId);
     const phaseId = assertPhaseId(req.params.phaseId);
+    await readAuthorizedProjectState(projectId, req);
     const questionAnswers = normalizeQuestionAnswers(req.body.questionAnswers);
     await writeQuestionAnswers(projectId, phaseId, questionAnswers);
     res.json({ questionAnswers });
@@ -911,6 +940,7 @@ app.post("/api/projects/:projectId/phases/:phaseId/run", async (req, res, next) 
   try {
     const projectId = assertProjectId(req.params.projectId);
     const phaseId = assertPhaseId(req.params.phaseId);
+    await readAuthorizedProjectState(projectId, req);
     const notes = String(req.body.notes || "").trim();
     const questionAnswers = Object.prototype.hasOwnProperty.call(req.body || {}, "questionAnswers")
       ? normalizeQuestionAnswers(req.body.questionAnswers)
@@ -926,6 +956,7 @@ app.post("/api/projects/:projectId/phases/:phaseId/complete", async (req, res, n
   try {
     const projectId = assertProjectId(req.params.projectId);
     const phaseId = assertPhaseId(req.params.phaseId);
+    await readAuthorizedProjectState(projectId, req);
     const gate = await readGateState(projectId, phaseId);
     const blockers = findGateBlockers(gate);
     if (blockers.length > 0) {
@@ -1428,6 +1459,61 @@ async function findAuthUser(username) {
   return (await readAuthUsers()).find((user) => user.username.toLowerCase() === requested) || null;
 }
 
+async function requestActor(req) {
+  const requested = String(
+    req.body?.actorUserName ||
+    req.query?.actorUserName ||
+    req.body?.userName ||
+    req.query?.userName ||
+    ""
+  ).trim();
+  const user = await findAuthUser(requested);
+  if (!user) {
+    const error = new Error("Login user context is required. Please sign in again.");
+    error.statusCode = 401;
+    throw error;
+  }
+  return {
+    username: user.username,
+    userType: user.userType || "User",
+    isAdmin: isAdminUser(user)
+  };
+}
+
+function isAdminUser(user) {
+  return String(user?.username || "").trim().toLowerCase() === BUILT_IN_ADMIN.username.toLowerCase()
+    || String(user?.userType || "").trim().toLowerCase() === "admin";
+}
+
+async function readAuthorizedProjectState(projectId, req) {
+  const actor = await requestActor(req);
+  const state = await readProjectState(projectId);
+  assertProjectAccess(state, actor);
+  return { state, actor };
+}
+
+function assertProjectAccess(state, actor) {
+  if (canAccessProject(state, actor)) return;
+  const error = new Error("You do not have access to this project.");
+  error.statusCode = 403;
+  throw error;
+}
+
+function canAccessProject(state, actor) {
+  if (actor?.isAdmin) return true;
+  const owner = projectOwnerUserName(state);
+  return owner.toLowerCase() === String(actor?.username || "").trim().toLowerCase();
+}
+
+function projectOwnerUserName(state) {
+  return String(
+    state?.ownerUserName ||
+    state?.createdByUserName ||
+    state?.createdBy ||
+    BUILT_IN_ADMIN.username
+  ).trim() || BUILT_IN_ADMIN.username;
+}
+
 async function readAuthUsers() {
   const merged = new Map();
   const addUser = (user) => {
@@ -1616,11 +1702,42 @@ async function discoverExcelPdfDataInputs(config) {
   };
 }
 
-async function resolveChecklistWorkbook(value) {
+async function discoverExcelPdfDataInputsForActor(config, actor) {
+  return discoverExcelPdfDataInputs(excelPdfConfigForActor(config, actor));
+}
+
+function excelPdfConfigForActor(config, actor) {
+  if (actor?.isAdmin) return config;
+  const emptyRoot = path.join(BROWSER_REVIEW_INPUT_ROOT, userReviewFolderName(actor?.username), "__empty__");
+  const safeConfig = { ...config };
+  safeConfig.checklistInput = reviewInputPathAllowedForActor(config.checklistInput, actor) ? config.checklistInput : emptyRoot;
+  safeConfig.excelFolder = reviewInputPathAllowedForActor(config.excelFolder, actor) ? config.excelFolder : emptyRoot;
+  safeConfig.pdfFolder = reviewInputPathAllowedForActor(config.pdfFolder, actor) ? config.pdfFolder : emptyRoot;
+  safeConfig.selectedChecklistPath = reviewInputPathAllowedForActor(config.selectedChecklistPath, actor) ? config.selectedChecklistPath : "";
+  safeConfig.selectedExcelPath = reviewInputPathAllowedForActor(config.selectedExcelPath, actor) ? config.selectedExcelPath : "";
+  safeConfig.selectedExcelPaths = (config.selectedExcelPaths || []).filter((item) => reviewInputPathAllowedForActor(item, actor));
+  safeConfig.selectedPdfPath = reviewInputPathAllowedForActor(config.selectedPdfPath, actor) ? config.selectedPdfPath : "";
+  safeConfig.selectedPdfPaths = (config.selectedPdfPaths || []).filter((item) => reviewInputPathAllowedForActor(item, actor));
+  return safeConfig;
+}
+
+function reviewInputPathAllowedForActor(value, actor) {
+  if (!value) return false;
+  if (actor?.isAdmin) return true;
+  const userRoot = path.join(BROWSER_REVIEW_INPUT_ROOT, userReviewFolderName(actor?.username));
+  return isInsidePath(userRoot, value);
+}
+
+async function resolveChecklistWorkbook(value, actor = null) {
   const resolved = normalizeOptionalPathInput(value);
   if (!resolved) {
     const error = new Error("Checklist workbook path is required.");
     error.statusCode = 400;
+    throw error;
+  }
+  if (actor && !actor.isAdmin && !reviewInputPathAllowedForActor(resolved, actor)) {
+    const error = new Error("You do not have access to this checklist workbook.");
+    error.statusCode = 403;
     throw error;
   }
   const extension = path.extname(resolved).toLowerCase();
@@ -1785,18 +1902,20 @@ async function listReviewFiles(inputPath, extensions, kind, recursive = false) {
   return results.sort((left, right) => left.name.localeCompare(right.name));
 }
 
-async function listExcelPdfProjectRepository(projectName) {
+async function listExcelPdfProjectRepository(projectName, userName = "", actor = null) {
   const projectSlug = slugify(projectName || "excel-pdf-data-review") || "excel-pdf-data-review";
   const projectFolder = projectFolderName(projectName || projectSlug);
-  const folderPath = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, projectFolder);
-  const folder = relativePath(AI_REVIEW_ROOT, folderPath);
-  const stat = await fsp.stat(folderPath).catch(() => null);
-  if (!stat?.isDirectory()) {
+  const repositoryRoots = await excelPdfRepositoryRootsForActor(projectFolder, userName, actor);
+  if (!repositoryRoots.length) {
+    const userFolder = actor?.isAdmin ? "" : userReviewFolderName(actor?.username || userName);
+    const folderPath = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, userFolder, projectFolder);
     return {
       projectName: projectName || "",
       projectSlug,
+      userName: userName || "",
+      userFolder,
       projectFolder,
-      folder,
+      folder: relativePath(AI_REVIEW_ROOT, folderPath),
       folderAbsolute: folderPath,
       exists: false,
       files: []
@@ -1804,7 +1923,9 @@ async function listExcelPdfProjectRepository(projectName) {
   }
 
   const files = [];
-  await collectProjectRepositoryFiles(folderPath, folderPath, folder, files);
+  for (const root of repositoryRoots) {
+    await collectProjectRepositoryFiles(root.folderPath, root.folderPath, root.folder, files);
+  }
 
   files.sort((left, right) => {
     const timeDiff = new Date(right.modifiedAt).getTime() - new Date(left.modifiedAt).getTime();
@@ -1815,12 +1936,42 @@ async function listExcelPdfProjectRepository(projectName) {
   return {
     projectName: projectName || "",
     projectSlug,
+    userName: userName || "",
+    userFolder: repositoryRoots.length === 1 ? repositoryRoots[0].userFolder : "",
     projectFolder,
-    folder,
-    folderAbsolute: folderPath,
+    folder: repositoryRoots.length === 1 ? repositoryRoots[0].folder : relativePath(AI_REVIEW_ROOT, EXCEL_PDF_REVIEW_OUTPUT_ROOT),
+    folderAbsolute: repositoryRoots.length === 1 ? repositoryRoots[0].folderPath : EXCEL_PDF_REVIEW_OUTPUT_ROOT,
     exists: true,
     files: latestFiles
   };
+}
+
+async function excelPdfRepositoryRootsForActor(projectFolder, userName = "", actor = null) {
+  if (actor?.isAdmin) {
+    const targetUserFolder = userName && userName.toLowerCase() !== actor.username.toLowerCase() ? userReviewFolderName(userName) : "";
+    if (targetUserFolder) {
+      return repositoryRootIfExists(targetUserFolder, projectFolder);
+    }
+    return excelPdfResultFolderCandidates(projectFolder);
+  }
+  const targetUserFolder = userReviewFolderName(actor?.username || userName);
+  if (userName && userReviewFolderName(userName).toLowerCase() !== targetUserFolder.toLowerCase()) {
+    const error = new Error("You do not have access to this user's review files.");
+    error.statusCode = 403;
+    throw error;
+  }
+  return repositoryRootIfExists(targetUserFolder, projectFolder);
+}
+
+async function repositoryRootIfExists(userFolder, projectFolder) {
+  const folderPath = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, userFolder, projectFolder);
+  const stat = await fsp.stat(folderPath).catch(() => null);
+  if (!stat?.isDirectory()) return [];
+  return [{
+    userFolder,
+    folderPath,
+    folder: relativePath(AI_REVIEW_ROOT, folderPath)
+  }];
 }
 
 async function collectProjectRepositoryFiles(folderPath, projectRootPath, projectRootRelative, files) {
@@ -1928,11 +2079,16 @@ function reviewArtifactType(fileName) {
   return "Review file";
 }
 
-async function latestExcelPdfResultJsonPath(projectName) {
+async function latestExcelPdfResultJsonPath(projectName, userName = "", actor = null) {
   const projectSlug = slugify(projectName || "excel-pdf-data-review") || "excel-pdf-data-review";
-  const folderPath = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, projectFolderName(projectName || projectSlug));
+  const projectFolder = projectFolderName(projectName || projectSlug);
+  const roots = actor
+    ? await excelPdfRepositoryRootsForActor(projectFolder, userName, actor)
+    : await excelPdfResultFolderCandidates(projectFolder);
   const jsonFiles = [];
-  await collectLatestReviewJsonFiles(folderPath, jsonFiles);
+  for (const root of roots) {
+    await collectLatestReviewJsonFiles(root.folderPath, jsonFiles);
+  }
   jsonFiles.sort((left, right) => right.modifiedAt - left.modifiedAt);
   if (!jsonFiles.length) {
     const error = new Error("No generated review JSON file is available for this project.");
@@ -1940,6 +2096,32 @@ async function latestExcelPdfResultJsonPath(projectName) {
     throw error;
   }
   return jsonFiles[0].path;
+}
+
+async function excelPdfResultFolderCandidates(projectFolder) {
+  const roots = [];
+  const rootProjectFolder = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, projectFolder);
+  const rootStat = await fsp.stat(rootProjectFolder).catch(() => null);
+  if (rootStat?.isDirectory()) {
+    roots.push({
+      userFolder: "",
+      folderPath: rootProjectFolder,
+      folder: relativePath(AI_REVIEW_ROOT, rootProjectFolder)
+    });
+  }
+  const entries = await fsp.readdir(EXCEL_PDF_REVIEW_OUTPUT_ROOT, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === projectFolder) continue;
+    const folderPath = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, entry.name, projectFolder);
+    const stat = await fsp.stat(folderPath).catch(() => null);
+    if (!stat?.isDirectory()) continue;
+    roots.push({
+      userFolder: entry.name,
+      folderPath,
+      folder: relativePath(AI_REVIEW_ROOT, folderPath)
+    });
+  }
+  return roots;
 }
 
 async function collectLatestReviewJsonFiles(folderPath, jsonFiles) {
@@ -2122,8 +2304,8 @@ function crossReportCountsFromPairwise(pairwise = []) {
     for (const comparison of comparisons) {
       const row = {
         metric: pairwiseComparisonMetricLabel(pair, comparison),
-        excel: labeledComparisonValue(pair.left_report, "Report 1", comparison.left_value),
-        pdf: labeledComparisonValue(pair.right_report, "Report 2", comparison.right_value),
+        excel: labeledComparisonValue(pair.left_report, "Report 1", comparison.left_display_value ?? comparison.left_value),
+        pdf: labeledComparisonValue(pair.right_report, "Report 2", comparison.right_display_value ?? comparison.right_value),
         status: comparison.state || pair.state || "-"
       };
       if (isInvalidSaifiSaidiDirectHierarchyEvidence(row)) counts.na += 1;
@@ -2581,8 +2763,8 @@ function reviewSummaryCorrectionObservations(result, findings = []) {
         report: [pair.left_report, pair.right_report].filter(Boolean).join(" vs "),
         title: pairwiseComparisonMetricLabel(pair, comparison),
         detail: [
-          labeledComparisonValue(pair.left_report, "Report 1", comparison.left_value),
-          labeledComparisonValue(pair.right_report, "Report 2", comparison.right_value),
+          labeledComparisonValue(pair.left_report, "Report 1", comparison.left_display_value ?? comparison.left_value),
+          labeledComparisonValue(pair.right_report, "Report 2", comparison.right_display_value ?? comparison.right_value),
           comparison.row_label ? `Row/date: ${comparison.row_label}` : "",
           comparison.metric ? `Metric: ${humanizeMetricName(comparison.metric)}` : ""
         ].filter(Boolean).join(" | "),
@@ -2701,8 +2883,8 @@ function reviewSummaryEvidenceRows(result) {
     for (const comparison of pair.comparisons || []) {
       pairRows.push({
         metric: pairwiseComparisonMetricLabel(pair, comparison),
-        excel: labeledComparisonValue(pair.left_report, "Left report", comparison.left_value),
-        pdf: labeledComparisonValue(pair.right_report, "Right report", comparison.right_value),
+        excel: labeledComparisonValue(pair.left_report, "Left report", comparison.left_display_value ?? comparison.left_value),
+        pdf: labeledComparisonValue(pair.right_report, "Right report", comparison.right_display_value ?? comparison.right_value),
         status: comparison.state || pair.state || "-"
       });
     }
@@ -2899,10 +3081,11 @@ async function runExcelOnlyDataDesignReview(config, files, startedAt) {
   const runId = formatLocalFileTimestamp(startedDate);
   const selectedChecklist = findSelectedFile(files.checklists, files.selected.checklistPath, "checklist");
   const selectedExcels = findSelectedFiles(files.excelFiles, files.selected.excelPaths, "Excel report");
+  const userFolder = userReviewFolderName(config.userName);
   const projectFolder = projectFolderName(config.projectName || projectSlug);
   const reportCategoryFolder = reviewReportCategoryFolderFromExcelFiles(selectedExcels);
   const runDateTimeFolder = runDateTimeFolderName(startedDate);
-  const projectOutputFolderAbs = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, projectFolder, reportCategoryFolder, runDateTimeFolder);
+  const projectOutputFolderAbs = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, userFolder, projectFolder, reportCategoryFolder, runDateTimeFolder);
   await ensureDir(projectOutputFolderAbs);
 
   const checklistWorkbook = readWorkbook(selectedChecklist.path);
@@ -2935,6 +3118,7 @@ async function runExcelOnlyDataDesignReview(config, files, startedAt) {
     project: {
       project_name: config.projectName || projectSlug,
       reviewer_name: config.userName || "",
+      user_folder: userFolder,
       report_category_folder: reportCategoryFolder,
       run_datetime_folder: runDateTimeFolder
     },
@@ -3085,6 +3269,7 @@ async function runExcelOnlyDataDesignReview(config, files, startedAt) {
   };
   await writeJson(summaryPath, {
     project_name: config.projectName || projectSlug,
+    user_folder: userFolder,
     report_category_folder: reportCategoryFolder,
     run_datetime_folder: runDateTimeFolder,
     user_name: config.userName || "",
@@ -3400,7 +3585,10 @@ function regexMatchCount(value, pattern) {
 
 function readExcelWorkbookProfile(file) {
   const workbook = readWorkbook(file.path);
-  const hierarchyScope = inferExcelHierarchyScope(file.name);
+  const reportName = excelWorkbookReportTitleFromWorkbook(workbook) || path.basename(file.name, path.extname(file.name));
+  const reportHeaderText = excelWorkbookReportHeaderTextFromWorkbook(workbook);
+  const reportIdentityText = [file.name, reportName, reportHeaderText].filter(Boolean).join(" ");
+  const hierarchyScope = inferExcelHierarchyScope(reportIdentityText);
   const sheetProfiles = workbook.SheetNames.map((sheetName) => {
     const sheet = workbook.Sheets[sheetName];
     const rows = sheetRows(sheet);
@@ -3441,11 +3629,10 @@ function readExcelWorkbookProfile(file) {
   });
   const allText = sheetProfiles.flatMap((sheet) => sheet.textValues);
   const hierarchyRows = hierarchyScope ? extractSaifiSaidiHierarchyRows(workbook, file.name, hierarchyScope) : [];
-  const reportName = excelWorkbookReportTitleFromWorkbook(workbook) || path.basename(file.name, path.extname(file.name));
   return {
     file,
     reportName,
-    validationGroup: inferExcelReportValidationGroup(file.name),
+    validationGroup: inferExcelReportValidationGroup(reportIdentityText),
     hierarchyScope,
     hierarchyRows,
     sheetCount: workbook.SheetNames.length,
@@ -3477,22 +3664,25 @@ function inferReviewReportFamilyFromExcelFile(file = {}) {
   return reviewReportFamilyFromText(headerText) || reviewReportFamilyFromText(file.name) || "miscellaneous";
 }
 
+function excelWorkbookReportHeaderTextFromWorkbook(workbook) {
+  const candidates = [];
+  for (const sheetName of (workbook.SheetNames || []).slice(0, 3)) {
+    const rows = sheetRows(workbook.Sheets[sheetName]).slice(0, 14);
+    for (const row of rows) {
+      const text = row.map((cell) => cleanCellText(cell)).filter(Boolean).join(" ");
+      if (!text || !looksLikeReportHeaderText(text)) continue;
+      candidates.push(text);
+      if (candidates.length >= 8) break;
+    }
+    if (candidates.length >= 8) break;
+  }
+  return candidates.join(" ");
+}
+
 function excelWorkbookReportHeaderText(filePath) {
   if (!filePath) return "";
   try {
-    const workbook = readWorkbook(filePath);
-    const candidates = [];
-    for (const sheetName of workbook.SheetNames.slice(0, 3)) {
-      const rows = sheetRows(workbook.Sheets[sheetName]).slice(0, 14);
-      for (const row of rows) {
-        const text = row.map((cell) => cleanCellText(cell)).filter(Boolean).join(" ");
-        if (!text || !looksLikeReportHeaderText(text)) continue;
-        candidates.push(text);
-        if (candidates.length >= 8) break;
-      }
-      if (candidates.length >= 8) break;
-    }
-    return candidates.join(" ");
+    return excelWorkbookReportHeaderTextFromWorkbook(readWorkbook(filePath));
   } catch {
     return "";
   }
@@ -3832,7 +4022,7 @@ function buildExcelHierarchySection(relation, baseReport, rollupReport) {
         insufficient_context_count: EXCEL_HIERARCHY_METRICS.length,
         comparisons: [],
         metrics: [],
-        evidence: `No Feeder Wise source rows were found for ${groupFieldLabel}: ${hierarchyDisplayKey(rollupRow, relation.groupFields) || "-"}.`
+        evidence: `No ${baseScopeLabel} source rows were found for ${groupFieldLabel}: ${hierarchyDisplayKey(rollupRow, relation.groupFields) || "-"}.`
       };
     }
     return compareExcelHierarchyGroup({ relation, feederReport: baseReport, rollupReport, rollupRow, sourceRows });
@@ -3846,7 +4036,7 @@ function buildExcelHierarchySection(relation, baseReport, rollupReport) {
       base_row_count: rows.length,
       child_row_count: rows.length,
       state: "mismatch",
-      evidence: `Feeder Wise source rows exist for ${groupFieldLabel}: ${hierarchyDisplayKey(rows[0], relation.groupFields) || "-"}, but no child rollup row was found.`
+      evidence: `${baseScopeLabel} source rows exist for ${groupFieldLabel}: ${hierarchyDisplayKey(rows[0], relation.groupFields) || "-"}, but no ${rollupScopeLabel} rollup row was found.`
     }));
 
   const matchCount = groups.reduce((sum, group) => sum + Number(group.match_count || 0), 0);
@@ -3878,7 +4068,9 @@ function buildExcelHierarchySection(relation, baseReport, rollupReport) {
 
 function compareExcelHierarchyGroup({ relation, feederReport, rollupReport, rollupRow, sourceRows }) {
   const aggregate = aggregateExcelHierarchyRows(sourceRows);
-  const comparisons = EXCEL_HIERARCHY_METRICS.map((metric) => {
+  const comparisons = EXCEL_HIERARCHY_METRICS.filter(
+    (metric) => hasExcelHierarchyMetricValue(aggregate, metric.key) && hasExcelHierarchyMetricValue(rollupRow, metric.key)
+  ).map((metric) => {
     const sourceValue = aggregate[metric.key];
     const rollupValue = rollupRow[metric.key];
     const state = compareExcelHierarchyValue(sourceValue, rollupValue, metric);
@@ -3917,25 +4109,39 @@ function compareExcelHierarchyGroup({ relation, feederReport, rollupReport, roll
   };
 }
 
+function hasExcelHierarchyMetricValue(row, key) {
+  const value = row?.[key];
+  return value !== null && value !== undefined && Number.isFinite(Number(value));
+}
+
 function aggregateExcelHierarchyRows(rows) {
   const totalWeight = rows.reduce((sum, row) => sum + (Number(row.weight) || 0), 0);
+  const useEqualWeights = !totalWeight && rows.length > 0;
+  const totalFeederValues = rows.map((row) => Number(row.total_feeders)).filter(Number.isFinite);
   const aggregate = {
-    total_feeders: rows.reduce((sum, row) => sum + (Number(row.total_feeders) || 0), 0),
+    total_feeders: totalFeederValues.length ? totalFeederValues.reduce((sum, value) => sum + value, 0) : null,
     source_row_count: rows.length,
-    weight: totalWeight
+    weight: totalWeight || rows.length,
+    weight_basis: totalWeight ? "total_feeders" : "visible_row_count"
   };
   for (const metric of EXCEL_HIERARCHY_METRICS.filter((item) => item.key !== "total_feeders")) {
-    if (!totalWeight) {
+    const comparableRows = rows.filter((row) => hasExcelHierarchyMetricValue(row, metric.key));
+    if (!comparableRows.length) {
       aggregate[metric.key] = null;
       continue;
     }
-    const weightedTotal = rows.reduce((sum, row) => {
+    const weightSum = comparableRows.reduce((sum, row) => sum + (useEqualWeights ? 1 : (Number(row.weight) || 0)), 0);
+    if (!weightSum) {
+      aggregate[metric.key] = null;
+      continue;
+    }
+    const weightedTotal = comparableRows.reduce((sum, row) => {
       const value = row[metric.key];
-      return Number.isFinite(value) ? sum + (Number(value) * (Number(row.weight) || 0)) : sum;
+      return Number.isFinite(value) ? sum + (Number(value) * (useEqualWeights ? 1 : (Number(row.weight) || 0))) : sum;
     }, 0);
     aggregate[metric.key] = metric.type === "duration_hms" || metric.type === "duration_hm"
-      ? Math.round(weightedTotal / totalWeight)
-      : roundNumber(weightedTotal / totalWeight, 2);
+      ? Math.round(weightedTotal / weightSum)
+      : roundNumber(weightedTotal / weightSum, 2);
   }
   return aggregate;
 }
@@ -4245,7 +4451,14 @@ function compareExcelProfilesWithinGroup(groupName, profiles) {
         metric: `${groupName} | ${first.sheetName}: ${first.label}`,
         excel: `${first.fileName}: ${first.value}`,
         pdf: `${other.fileName}: ${other.value}`,
-        status: state
+        status: state,
+        validation_group: groupName,
+        left_report: first.fileName,
+        right_report: other.fileName,
+        left_value: first.value,
+        right_value: other.value,
+        row_label: first.label,
+        sheet_name: first.sheetName
       };
       if (state === "match") matchRows.push(row);
       else mismatchRows.push(row);
@@ -4254,6 +4467,58 @@ function compareExcelProfilesWithinGroup(groupName, profiles) {
     if (mismatchRows.length >= 200) break;
   }
   return { matchRows, mismatchRows };
+}
+
+function crossExcelMismatchValueDetail(comparison, profile = null, limit = 6) {
+  const profileNames = new Set(
+    [
+      profile?.file?.name,
+      profile?.reportName
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+  );
+  const rows = (comparison?.mismatchRows || []).filter((row) => {
+    if (!profileNames.size) return true;
+    return [row.left_report, row.right_report, row.excel, row.pdf]
+      .some((value) => [...profileNames].some((name) => String(value || "").includes(name)));
+  });
+  if (!rows.length) return "";
+  const samples = rows.slice(0, limit).map((row) => {
+    const leftReport = row.left_report || String(row.excel || "").split(":")[0] || "Report 1";
+    const rightReport = row.right_report || String(row.pdf || "").split(":")[0] || "Report 2";
+    const leftValue = row.left_value ?? String(row.excel || "").replace(/^[^:]+:\s*/, "");
+    const rightValue = row.right_value ?? String(row.pdf || "").replace(/^[^:]+:\s*/, "");
+    return `${row.metric || row.row_label || "Metric"} -> ${leftReport}: ${leftValue}, ${rightReport}: ${rightValue}`;
+  });
+  const extraCount = Math.max(0, rows.length - samples.length);
+  return `Mismatch value detail: ${samples.join("; ")}${extraCount ? `; ${extraCount} more mismatch(es)` : ""}.`;
+}
+
+function hierarchyMismatchValueDetail(section, limit = 6) {
+  const rows = [];
+  const fieldLabel = hierarchyFieldList(section?.group_fields || []);
+  for (const group of section?.groups || []) {
+    for (const comparison of group.comparisons || group.metrics || []) {
+      if (comparison.state !== "mismatch") continue;
+      rows.push(
+        `${group.group_display || group.group_key || "-"} / ${comparison.label || comparison.metric || "Metric"} -> `
+        + `${section.base_report || "Source report"} grouped by ${fieldLabel}: ${comparison.source_display || comparison.base_aggregated_display || "-"}, `
+        + `${section.rollup_report || "Rollup report"}: ${comparison.rollup_display || comparison.parent_display || "-"}`
+      );
+    }
+  }
+  for (const missingGroup of section?.missing_parent_groups || []) {
+    rows.push(
+      `${missingGroup.group_display || missingGroup.group_key || "-"} / Rollup row presence -> `
+      + `${section.base_report || "Source report"} grouped by ${fieldLabel}: present, `
+      + `${section.rollup_report || "Rollup report"}: missing`
+    );
+  }
+  if (!rows.length) return "";
+  const samples = rows.slice(0, limit);
+  const extraCount = Math.max(0, rows.length - samples.length);
+  return `Mismatch value detail: ${samples.join("; ")}${extraCount ? `; ${extraCount} more mismatch(es)` : ""}.`;
 }
 
 function compareSaifiSaidiProfilesWithinGroup(groupName, profiles) {
@@ -4312,7 +4577,9 @@ function compareSaifiSaidiSameScopePair(groupName, leftProfile, rightProfile) {
         row_label: displayKey || "",
         metric_key: metric.key,
         left_report: leftProfile.file.name,
-        right_report: rightProfile.file.name
+        right_report: rightProfile.file.name,
+        left_value: formatExcelHierarchyValue(leftValue, metric.type),
+        right_value: formatExcelHierarchyValue(rightValue, metric.type)
       };
       if (state === "match") matchRows.push(row);
       else mismatchRows.push(row);
@@ -4419,13 +4686,18 @@ function buildExcelOnlyDesignRows(checklist, profiles) {
   return checklistPoints.slice(0, 120).map((point, index) => {
     const statuses = {};
     for (const profile of profiles) {
-      statuses[profile.file.name] = evaluateExcelDesignPoint(point.text, profile);
+      statuses[profile.file.name] = enrichExcelMatrixStatus({
+        area: "Design",
+        checkPoint: point.text,
+        profile,
+        status: evaluateExcelDesignPoint(point.text, profile)
+      });
     }
     return {
       s_no: index + 1,
       section: point.section || "Excel Design",
       check_point: point.text,
-      remarks: firstNotOkEvidence(statuses) || "Validated against selected Excel workbook structure.",
+      remarks: excelMatrixRowRemarks(statuses),
       statuses
     };
   });
@@ -4442,13 +4714,18 @@ function buildExcelOnlyDataRows(checklist, profiles, comparison, hierarchyValida
   return checklistPoints.slice(0, 120).map((point, index) => {
     const statuses = {};
     for (const profile of profiles) {
-      statuses[profile.file.name] = evaluateExcelDataPoint(point.text, profile, comparison, profiles.length, profiles, hierarchyValidation);
+      statuses[profile.file.name] = enrichExcelMatrixStatus({
+        area: "Data",
+        checkPoint: point.text,
+        profile,
+        status: evaluateExcelDataPoint(point.text, profile, comparison, profiles.length, profiles, hierarchyValidation)
+      });
     }
     return {
       s_no: index + 1,
       section: point.section || "Excel Data",
       check_point: point.text,
-      remarks: firstNotOkEvidence(statuses) || "Validated from selected Excel workbook data.",
+      remarks: excelMatrixRowRemarks(statuses),
       statuses
     };
   });
@@ -4464,20 +4741,94 @@ function missingChecklistSectionRows(checklist, profiles, section) {
     : message;
   const statuses = {};
   for (const profile of profiles) {
-    statuses[profile.file.name] = matrixStatus("NA", evidence);
+    statuses[profile.file.name] = enrichExcelMatrixStatus({
+      area: section,
+      checkPoint: message,
+      profile,
+      status: matrixStatus("NA", evidence)
+    });
   }
   return [{
     s_no: 1,
     section,
     check_point: message,
-    remarks: evidence,
+    remarks: excelMatrixRowRemarks(statuses),
     statuses
   }];
+}
+
+function excelProfileVisibleText(profile) {
+  return (profile.sheetProfiles || [])
+    .flatMap((sheet) => sheet.textValues || [])
+    .map((value) => String(value || ""))
+    .join(" ");
+}
+
+function uniqueRegexMatches(text, pattern) {
+  return [...new Set(Array.from(String(text || "").matchAll(pattern), (match) => match[0]))];
+}
+
+function dateTimeFormatTokens(profile) {
+  const text = excelProfileVisibleText(profile);
+  return {
+    dateOnly: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b(?!\s+\d{1,2}:\d{2})/g),
+    minute: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s+\d{1,2}:\d{2}\b(?!:\d{2})/g),
+    second: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s+\d{1,2}:\d{2}:\d{2}\b(?!\.\d)/g),
+    millisecond: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s+\d{1,2}:\d{2}:\d{2}\.\d{1,3}\b/g),
+    month: uniqueRegexMatches(text, /\b[A-Z]{3}[-/]\d{4}\b/gi)
+  };
+}
+
+function detectedDateTimeFormatSummary(tokens) {
+  const detected = [];
+  if (tokens.dateOnly.length) detected.push(`DD-MM-YYYY (${tokens.dateOnly.slice(0, 2).join(", ")})`);
+  if (tokens.minute.length) detected.push(`DD-MM-YYYY HH:MM (${tokens.minute.slice(0, 2).join(", ")})`);
+  if (tokens.second.length) detected.push(`DD-MM-YYYY HH:MM:SS (${tokens.second.slice(0, 2).join(", ")})`);
+  if (tokens.millisecond.length) detected.push(`DD-MM-YYYY HH:MM:SS.sss (${tokens.millisecond.slice(0, 2).join(", ")})`);
+  if (tokens.month.length) detected.push(`MMM-YYYY (${tokens.month.slice(0, 2).join(", ")})`);
+  return detected.length ? `Detected format(s): ${detected.join("; ")}.` : "No date or date-time token was detected in workbook text.";
+}
+
+function evaluateExcelDesignDateTimePoint(pointText, profile) {
+  const text = String(pointText || "").toLowerCase();
+  const tokens = dateTimeFormatTokens(profile);
+  const summary = detectedDateTimeFormatSummary(tokens);
+
+  if (text.includes("date time with millisecond") || text.includes("hh:mm:ss.sss")) {
+    return tokens.millisecond.length
+      ? matrixStatus("OK", `Detected DD-MM-YYYY HH:MM:SS.sss date-time token(s): ${tokens.millisecond.slice(0, 3).join(", ")}.`)
+      : matrixStatus("NA", `DD-MM-YYYY HH:MM:SS.sss was not detected in this Excel report. ${summary}`);
+  }
+
+  if (text.includes("date time with second") || (text.includes("hh:mm:ss") && !text.includes("sss"))) {
+    return tokens.second.length
+      ? matrixStatus("OK", `Detected DD-MM-YYYY HH:MM:SS date-time token(s): ${tokens.second.slice(0, 3).join(", ")}.`)
+      : matrixStatus("NA", `DD-MM-YYYY HH:MM:SS was not detected in this Excel report. ${summary}`);
+  }
+
+  if (text.includes("date time format") || text.includes("hh:mm")) {
+    return tokens.minute.length
+      ? matrixStatus("OK", `Detected DD-MM-YYYY HH:MM date-time token(s): ${tokens.minute.slice(0, 3).join(", ")}.`)
+      : matrixStatus("NA", `DD-MM-YYYY HH:MM was not detected in this Excel report. ${summary}`);
+  }
+
+  if (text.includes("month") || text.includes("mmm-yyyy")) {
+    return tokens.month.length
+      ? matrixStatus("OK", `Detected MMM-YYYY month token(s): ${tokens.month.slice(0, 3).join(", ")}.`)
+      : matrixStatus("NA", `MMM-YYYY was not detected in this Excel report. ${summary}`);
+  }
+
+  return tokens.dateOnly.length
+    ? matrixStatus("OK", `Detected DD-MM-YYYY date token(s): ${tokens.dateOnly.slice(0, 3).join(", ")}.`)
+    : matrixStatus("NA", `DD-MM-YYYY was not detected as a date-only value in this Excel report. ${summary}`);
 }
 
 function evaluateExcelDesignPoint(pointText, profile) {
   const text = pointText.toLowerCase();
   if (!profile.usedSheetCount || !profile.populatedCount) return matrixStatus("NOT OK", "Workbook has no readable populated report sheet.");
+  if (/\bdate\b|\bmonth\b|dd-mm-yyyy|hh:mm|mmm-yyyy/i.test(pointText)) {
+    return evaluateExcelDesignDateTimePoint(pointText, profile);
+  }
   if (/\b(header|title|report name)\b/.test(text)) {
     const hasHeader = profile.sheetProfiles.some((sheet) => sheet.textValues.slice(0, 40).some((value) => /report|parameter|summary|daily|maximum|minimum|analog|feeder|division|zone/i.test(value)));
     return hasHeader ? matrixStatus("OK", "Header/title-like text was found in the workbook.") : matrixStatus("NOT OK", "No header/title-like text was found in the first workbook rows.");
@@ -4503,14 +4854,14 @@ function evaluateExcelDataPoint(pointText, profile, comparison, selectedExcelCou
     if (/\b(source|feeder\s+wise)\b/i.test(pointText)) {
       return feederSelected
         ? matrixStatus("OK", "Feeder Wise SAIFI/SAIDI source report is selected for hierarchy validation.")
-        : matrixStatus("NA", "Feeder Wise source report is not selected. The selected SAIFI/SAIDI reports will be validated by matching common report level, row label, and metric columns where available.");
+        : matrixStatus("NA", "Feeder Wise report is not selected, so this Feeder-specific checklist point is not applicable. The selected SAIFI/SAIDI reports are validated by report title, row label, and common visible metric columns.");
     }
     const section = hierarchySectionForChecklistPoint(pointText, hierarchyValidation);
     if (section) {
       if (section.state === "mismatch") {
         return matrixStatus(
           "NOT OK",
-          `${section.mismatch_count || 0} hierarchy mismatch(es) found in ${section.section}. ${section.base_report || "Source report"} was grouped by ${hierarchyFieldList(section.group_fields || [])} and compared with ${section.rollup_report}.`
+          `${section.mismatch_count || 0} hierarchy mismatch(es) found in ${section.section}. ${section.base_report || "Source report"} was grouped by ${hierarchyFieldList(section.group_fields || [])} and compared with ${section.rollup_report}. ${hierarchyMismatchValueDetail(section)}`
         );
       }
       if (section.state === "match") {
@@ -4520,7 +4871,7 @@ function evaluateExcelDataPoint(pointText, profile, comparison, selectedExcelCou
     }
     if (saifiCounts.match + saifiCounts.mismatch > 0) {
       return saifiCounts.mismatch
-        ? matrixStatus("NOT OK", `${saifiCounts.mismatch} same-level SAIFI/SAIDI row-level mismatch(es) found. Only common row labels and common metrics such as Unplanned SAIFI/SAIDI were compared.`)
+        ? matrixStatus("NOT OK", `${saifiCounts.mismatch} same-level SAIFI/SAIDI row-level mismatch(es) found. Only common row labels and common metrics such as Unplanned SAIFI/SAIDI were compared. ${crossExcelMismatchValueDetail(comparison, profile)}`)
         : matrixStatus("OK", `${saifiCounts.match} same-level SAIFI/SAIDI row value(s) matched using common report level, row labels, and metric columns.`);
     }
     if (selectedExcelCount > 1 && hierarchyValidation?.section_count) {
@@ -4557,7 +4908,7 @@ function evaluateExcelDataPoint(pointText, profile, comparison, selectedExcelCou
       return matrixStatus("NA", "No common comparable metrics were found within the selected report family groups.");
     }
     return comparison.mismatchRows.length
-      ? matrixStatus("NOT OK", `${comparison.mismatchRows.length} row-level mismatch(es) found across selected Excel reports.`)
+      ? matrixStatus("NOT OK", `${comparison.mismatchRows.length} row-level mismatch(es) found across selected Excel reports. ${crossExcelMismatchValueDetail(comparison, profile)}`)
       : matrixStatus("OK", `${comparison.matchRows.length} comparable row value(s) matched across selected Excel reports.`);
   }
   return matrixStatus("OK", "Workbook data is readable for this validation point.");
@@ -4587,6 +4938,70 @@ function saifiSaidiComparisonCounts(comparison = {}) {
 
 function matrixStatus(display, evidence) {
   return { display, evidence };
+}
+
+function cleanMatrixEvidenceText(value) {
+  const text = String(Array.isArray(value) ? value.filter(Boolean).join(" ") : value || "").trim();
+  if (!text || /^[DNY]$/i.test(text)) return "";
+  return text.replace(/\s+/g, " ");
+}
+
+function excelProfileAnalysisScope(profile = {}) {
+  const reportName = profile.reportName || profile.file?.name || "selected report";
+  const sheetNames = (profile.sheetProfiles || [])
+    .filter((sheet) => Number(sheet.rowCount || 0) > 0)
+    .map((sheet) => sheet.sheetName)
+    .filter(Boolean);
+  const sheetText = sheetNames.length
+    ? `populated sheet(s): ${sheetNames.slice(0, 4).join(", ")}${sheetNames.length > 4 ? ` and ${sheetNames.length - 4} more` : ""}`
+    : "no populated sheet name detected";
+  return `Analyzed workbook ${profile.file?.name || "-"} for report "${reportName}" across ${profile.usedSheetCount || 0}/${profile.sheetCount || 0} populated sheet(s), ${profile.totalRows || 0} populated row(s), and up to ${profile.maxColumns || 0} column(s); ${sheetText}. Report family: ${profile.validationGroup || "Generic"}${profile.hierarchyScope ? `; hierarchy scope: ${profile.hierarchyScope}` : ""}.`;
+}
+
+function fallbackMatrixEvidence(area, display, checkPoint, profile = {}) {
+  const subject = area === "Data" ? "data validation" : "design validation";
+  const reportName = profile.reportName || profile.file?.name || "this report";
+  if (display === "OK") {
+    return `${reportName} satisfies this ${subject} checklist point based on the analyzed Excel workbook content.`;
+  }
+  if (display === "NA") {
+    return `${reportName} does not expose the exact field, metric, format, or report context required by this checklist point, so the point is not applicable for this selected file.`;
+  }
+  return `${reportName} does not satisfy the expected ${subject} condition for this checklist point.`;
+}
+
+function enrichExcelMatrixStatus({ area, checkPoint, profile, status }) {
+  const display = String(status?.display || "NA").trim() || "NA";
+  const rawEvidence = cleanMatrixEvidenceText(status?.evidence);
+  const reportName = profile?.reportName || profile?.file?.name || "selected report";
+  const reason = rawEvidence || fallbackMatrixEvidence(area, display, checkPoint, profile);
+  const scope = excelProfileAnalysisScope(profile);
+  const resultMeaning =
+    display === "OK"
+      ? "Result OK means the required evidence or matching condition was found."
+      : display === "NA"
+      ? "Result NA means this checklist point is not applicable to the selected report/context, or the exact requested metric/format was not present."
+      : "Result Not OK means the expected condition failed and needs correction or accepted exception evidence.";
+  const evidence = `${display}: Checked "${checkPoint}" for "${reportName}". ${reason} ${resultMeaning} ${scope}`;
+  return {
+    ...(status || {}),
+    display,
+    raw_evidence: status?.evidence || "",
+    evidence,
+    explanation: evidence
+  };
+}
+
+function excelMatrixRowRemarks(statuses = {}) {
+  const rows = Object.entries(statuses)
+    .map(([reportName, status], index) => {
+      const display = status.display || "-";
+      const evidence = String(status.evidence || "-");
+      const displayPrefix = `${String(display).toLowerCase()}:`;
+      const detail = evidence.trim().toLowerCase().startsWith(displayPrefix) ? evidence : `${display} - ${evidence}`;
+      return `${index + 1}. ${reportName}: ${detail}`;
+    });
+  return rows.join("\n");
 }
 
 function firstNotOkEvidence(statuses) {
@@ -5302,15 +5717,17 @@ function findSelectedFiles(files, selectedPaths = [], label) {
 
 async function finalizeExcelPdfProjectArtifacts({ parsed, config, runPlan, stdout, stderr, startedAt }) {
   const projectSlug = runPlan.projectSlug;
+  const userFolder = userReviewFolderName(config.userName);
   const projectFolder = projectFolderName(config.projectName || projectSlug);
   const reportCategoryFolder = runPlan.reportCategoryFolder || reviewReportCategoryFolderFromExcelFiles(runPlan.selected?.excels || []);
   const runDateTimeFolder = runDateTimeFolderName(startedAt ? new Date(startedAt) : new Date());
-  const projectOutputFolderAbs = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, projectFolder, reportCategoryFolder, runDateTimeFolder);
+  const projectOutputFolderAbs = path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, userFolder, projectFolder, reportCategoryFolder, runDateTimeFolder);
   await ensureDir(projectOutputFolderAbs);
 
   const metadata = {
     project_name: config.projectName || projectSlug,
     project_slug: projectSlug,
+    user_folder: userFolder,
     project_folder: projectFolder,
     report_category_folder: reportCategoryFolder,
     run_datetime_folder: runDateTimeFolder,
@@ -5438,7 +5855,14 @@ function assertInside(baseDir, targetPath) {
   return target;
 }
 
-function resolveRepositoryFile(value) {
+function isInsidePath(baseDir, targetPath) {
+  const base = path.resolve(baseDir);
+  const target = path.resolve(targetPath);
+  const baseWithSeparator = base.endsWith(path.sep) ? base : `${base}${path.sep}`;
+  return target.toLowerCase() === base.toLowerCase() || target.toLowerCase().startsWith(baseWithSeparator.toLowerCase());
+}
+
+function resolveRepositoryFile(value, actor = null) {
   const text = String(value || "").trim();
   if (!text) {
     const error = new Error("Review file path is required.");
@@ -5448,6 +5872,11 @@ function resolveRepositoryFile(value) {
 
   const targetPath = path.isAbsolute(text) ? text : path.resolve(AI_REVIEW_ROOT, text);
   const safePath = assertInside(EXCEL_PDF_REVIEW_OUTPUT_ROOT, targetPath);
+  if (actor && !actor.isAdmin && !isInsidePath(path.join(EXCEL_PDF_REVIEW_OUTPUT_ROOT, userReviewFolderName(actor.username)), safePath)) {
+    const error = new Error("You do not have access to this review file.");
+    error.statusCode = 403;
+    throw error;
+  }
   if (!fs.existsSync(safePath) || !fs.statSync(safePath).isFile()) {
     const error = new Error("Review file was not found.");
     error.statusCode = 404;
@@ -5486,6 +5915,10 @@ function relativePath(baseDir, targetPath) {
 
 function projectFolderName(value) {
   return safeFileName(value || "excel-pdf-data-review", "excel-pdf-data-review");
+}
+
+function userReviewFolderName(value) {
+  return safeFileName(value || "unknown-user", "unknown-user");
 }
 
 function safeFileName(value, fallback = "review-file") {
@@ -5540,7 +5973,7 @@ async function writeText(filePath, value) {
   await fsp.writeFile(filePath, value, "utf8");
 }
 
-async function moveProjectToTrash(projectId) {
+async function moveProjectToTrash(projectId, actor = null) {
   const source = assertInside(PROJECTS_ROOT, projectPath(projectId));
   const trashRoot = assertInside(PROJECTS_ROOT, path.join(PROJECTS_ROOT, "_trash"));
   const state = await readProjectState(projectId);
@@ -5562,6 +5995,7 @@ async function moveProjectToTrash(projectId) {
   await writeJson(path.join(target, "trash-metadata.json"), {
     projectId,
     projectName: state.projectName,
+    movedByUserName: actor?.username || "",
     movedToTrashAt: new Date().toISOString(),
     originalPath: `projects/${projectId}`,
     trashPath: path.relative(ROOT, target).replace(/\\/g, "/")
@@ -5574,7 +6008,7 @@ async function moveProjectToTrash(projectId) {
   };
 }
 
-async function createProjectWorkspace({ projectId, projectName, owner, targetPlatform }) {
+async function createProjectWorkspace({ projectId, projectName, owner, targetPlatform, ownerUserName, createdByUserName }) {
   const projectRoot = projectPath(projectId);
   const directories = [
     "",
@@ -5598,6 +6032,8 @@ async function createProjectWorkspace({ projectId, projectName, owner, targetPla
     projectId,
     projectName,
     owner,
+    ownerUserName: ownerUserName || createdByUserName || BUILT_IN_ADMIN.username,
+    createdByUserName: createdByUserName || ownerUserName || BUILT_IN_ADMIN.username,
     targetPlatform,
     status: "active",
     currentPhaseId: PHASES[0].id,
@@ -5642,6 +6078,8 @@ async function readProjectState(projectId) {
     projectId,
     projectName,
     owner,
+    ownerUserName: BUILT_IN_ADMIN.username,
+    createdByUserName: BUILT_IN_ADMIN.username,
     targetPlatform: matchLine(projectMarkdown, /^- Target platform:\s*(.*)$/m) || "",
     status: matchLine(projectMarkdown, /^- Status:\s*(.*)$/m) || "active",
     currentPhaseId,
@@ -5682,6 +6120,7 @@ async function writeProjectMarkdown(state) {
 - Status: ${state.status}
 - Current phase: ${state.currentPhaseId}
 - Business owner: ${state.owner || ""}
+- Login owner: ${projectOwnerUserName(state)}
 - Technical owner:
 - Support owner:
 - Target platform: ${state.targetPlatform || ""}
@@ -5732,6 +6171,8 @@ function toProjectSummary(state) {
     projectId: state.projectId,
     projectName: state.projectName,
     owner: state.owner,
+    ownerUserName: projectOwnerUserName(state),
+    createdByUserName: state.createdByUserName || projectOwnerUserName(state),
     status: state.status,
     currentPhaseId: state.currentPhaseId,
     targetPlatform: state.targetPlatform,

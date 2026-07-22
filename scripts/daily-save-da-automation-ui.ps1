@@ -1,6 +1,9 @@
 param(
     [string]$RepoRoot = "D:\AIReview\da_automation",
-    [string]$MessagePrefix = "Daily DA Automation UI save"
+    [string]$MessagePrefix = "Daily DA Automation UI save",
+    [string]$RemoteName = "origin",
+    [string]$BranchName = "",
+    [switch]$NoPush
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,15 +25,46 @@ function Write-Log {
     Write-Host $line
 }
 
+function Invoke-Git {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+    & git @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "git $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
+}
+
 Write-Log "Starting daily save."
 
-git add -- ".gitignore" "scripts\daily-save-da-automation-ui.ps1" "DA AUTOMATION UI"
+Invoke-Git add -- ".gitignore" "scripts\daily-save-da-automation-ui.ps1" "DA AUTOMATION UI"
 
 $staged = git diff --cached --name-only
-if (-not $staged) {
+if ($staged) {
+    Invoke-Git commit -m "${MessagePrefix}: $timestamp"
+    Write-Log "Created commit for staged DA Automation UI changes."
+} else {
     Write-Log "No staged changes to commit."
+}
+
+if ($NoPush) {
+    Write-Log "Push skipped because -NoPush was provided."
     exit 0
 }
 
-git commit -m "${MessagePrefix}: $timestamp"
-Write-Log "Created commit for staged DA Automation UI changes."
+$remoteUrl = git remote get-url $RemoteName 2>$null
+if (-not $remoteUrl) {
+    Write-Log "No Git remote named '$RemoteName' is configured. Add a GitHub repository remote first, for example: git remote add origin https://github.com/<github-user>/<repo-name>.git"
+    exit 0
+}
+
+if (-not $BranchName) {
+    $BranchName = git branch --show-current
+}
+if (-not $BranchName) {
+    throw "Unable to determine the current Git branch."
+}
+
+Invoke-Git push -u $RemoteName $BranchName
+Write-Log "Pushed daily version to $RemoteName/$BranchName."
