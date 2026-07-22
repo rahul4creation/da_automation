@@ -1,0 +1,153 @@
+{
+  "projectContext": [
+    {
+      "item": "Project ID",
+      "requiredCondition": "Stable project_id is known and uses lowercase letters, digits, hyphens, and underscores.",
+      "status": "Complete",
+      "evidence": "project_id",
+      "owner": "Admin",
+      "notes": ""
+    },
+    {
+      "item": "Project workspace",
+      "requiredCondition": "Project artifact root exists or will be created under projects/<project_id>/.",
+      "status": "Complete",
+      "evidence": "projects/project_id",
+      "owner": "Admin",
+      "notes": ""
+    },
+    {
+      "item": "Project control file",
+      "requiredCondition": "PROJECT.md exists or will be created for the project.",
+      "status": "Complete",
+      "evidence": "projects/project_id/PROJECT.md",
+      "owner": "Admin",
+      "notes": ""
+    },
+    {
+      "item": "Current phase",
+      "requiredCondition": "Active phase is known.",
+      "status": "Complete",
+      "evidence": "01-requirement-intake",
+      "owner": "Admin",
+      "notes": ""
+    },
+    {
+      "item": "Artifact path",
+      "requiredCondition": "Output location for the current artifact is known.",
+      "status": "Complete",
+      "evidence": "projects/project_id/phases/07-approval-delivery/delivery-summary.md",
+      "owner": "Admin",
+      "notes": ""
+    },
+    {
+      "item": "Project owner",
+      "requiredCondition": "Business owner, requester, or proxy owner is known.",
+      "status": "Complete",
+      "evidence": "Admin",
+      "owner": "Admin",
+      "notes": ""
+    },
+    {
+      "item": "Cross-project scope",
+      "requiredCondition": "If multiple projects are affected, each project_id is listed.",
+      "status": "Not applicable",
+      "evidence": "Single project workspace.",
+      "owner": "Admin",
+      "notes": "No cross-project scope declared."
+    }
+  ],
+  "entry": [
+    {
+      "item": "Project context ready",
+      "requiredCondition": "Project Context Gate is complete for the same project_id as Phase 6.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Testing complete",
+      "requiredCondition": "Phase 6 release recommendation is pass or pass with accepted risks.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Delivery artifact ready",
+      "requiredCondition": "Final dashboard/report/query/export exists in the target environment or release package.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Owners known",
+      "requiredCondition": "Business owner, technical owner, support owner, and approver are identified.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Deployment path known",
+      "requiredCondition": "Publish, access, refresh, rollback, and monitoring path is known.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "exit": [
+    {
+      "item": "Delivery summary",
+      "requiredCondition": "Final artifact, platform, environment, version, link/location, owners, and scope are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Deployment record",
+      "requiredCondition": "Publish steps, refresh schedule, access groups, rollback, and monitoring are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Review/test summary",
+      "requiredCondition": "Review status, test status, open defects, and accepted risks are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Sign-off",
+      "requiredCondition": "Business and technical sign-off are recorded; client sign-off is recorded when applicable.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Support handoff",
+      "requiredCondition": "Support owner, escalation path, known limitations, and post-delivery actions are assigned.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Governance closure",
+      "requiredCondition": "Future enhancements, monitoring checks, and change ownership are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "updatedAt": "2026-07-07T09:39:38.200Z"
+}

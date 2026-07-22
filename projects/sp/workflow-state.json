@@ -1,0 +1,54 @@
+{
+  "projectId": "sp",
+  "projectName": "sample_project",
+  "owner": "Gaurav",
+  "targetPlatform": "Grafana",
+  "status": "active",
+  "currentPhaseId": "01-requirement-intake",
+  "createdAt": "2026-05-28T12:15:05.870Z",
+  "updatedAt": "2026-05-28T12:22:43.650Z",
+  "phases": {
+    "01-requirement-intake": {
+      "status": "in-progress",
+      "gateRecommendation": "No-go: gate blockers remain",
+      "lastArtifact": "projects/sp/phases/01-requirement-intake/requirement-brief.md",
+      "updatedAt": "2026-05-28T12:22:43.650Z"
+    },
+    "02-ai-analysis-understanding": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-05-28T12:15:05.870Z"
+    },
+    "03-sql-draft-logic-preparation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-05-28T12:15:05.870Z"
+    },
+    "04-dashboard-report-development": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-05-28T12:15:05.870Z"
+    },
+    "05-ai-review-validation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-05-28T12:15:05.870Z"
+    },
+    "06-testing-verification": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-05-28T12:15:05.870Z"
+    },
+    "07-approval-delivery": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-05-28T12:15:05.870Z"
+    }
+  }
+}

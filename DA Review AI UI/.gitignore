@@ -1,0 +1,43 @@
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+
+# Python/cache artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Logs and temporary output
+*.log
+*.err
+tmp/
+temp/
+
+# Node/Vite app
+node_modules/
+dist/
+*.tsbuildinfo
+test-results/
+playwright-report/
+
+# Local secrets/config
+.env
+.env.*
+!.env.example
+
+# Project workspaces: keep documentation, avoid raw/sensitive data by default
+projects/_trash/
+projects/*/data/
+projects/*/exports/
+projects/*/evidence/raw/
+projects/*/phases/*/uploads/

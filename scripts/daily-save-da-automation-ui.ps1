@@ -38,7 +38,14 @@ function Invoke-Git {
 
 Write-Log "Starting daily save."
 
-Invoke-Git add -- ".gitignore" "scripts\daily-save-da-automation-ui.ps1" "DA AUTOMATION UI"
+Invoke-Git add -- `
+    ".gitignore" `
+    "scripts\daily-save-da-automation-ui.ps1" `
+    "DA AUTOMATION UI" `
+    "DA Review AI UI" `
+    "excel_pdf_data_review_ui" `
+    "projects\project_id" `
+    "projects\sp"
 
 $staged = git diff --cached --name-only
 if ($staged) {
