@@ -708,27 +708,12 @@ app.post("/api/excel-pdf-data/run", async (req, res) => {
   try {
     const actor = await requestActor(req);
     const config = normalizeExcelPdfDataOptions(req.body || {});
+    const hasSelectedPdf = Boolean(config.selectedPdfPath) || (config.selectedPdfPaths || []).length > 0;
+    if (!hasSelectedPdf) config.excelOnly = true;
     if (!actor.isAdmin) config.userName = actor.username;
     if (actor.isAdmin && !config.userName) config.userName = actor.username;
     const files = await discoverExcelPdfDataInputsForActor(config, actor);
     const startedAt = new Date().toISOString();
-    if (config.excelOnly) {
-      const excelOnlyResult = await runExcelOnlyDataDesignReview(config, files, startedAt);
-      return res.json({
-        ok: true,
-        startedAt,
-        completedAt: new Date().toISOString(),
-        command: "internal excel-only data/design review",
-        args: [],
-        config,
-        files,
-        runPlan: excelOnlyResult.runPlan,
-        stdout: excelOnlyResult.stdout,
-        stderr: "",
-        parsed: excelOnlyResult.parsed,
-        projectArtifacts: excelOnlyResult.projectArtifacts
-      });
-    }
     const runPlan = await prepareExcelPdfDataRun(config, files);
     const args = buildExcelPdfDataArgs(runPlan.agentConfig);
     const { stdout, stderr } = await execFileAsync(process.execPath, [EXCEL_PDF_AGENT_SCRIPT, ...args], {
@@ -3057,6 +3042,7 @@ function parseExcelPdfDataStdout(stdout) {
     "PDF data validation Markdown": "pdfDataValidationMarkdownPath",
     "Design PDF": "designPdfPath",
     "Excel data validation PDF": "excelDataValidationPdfPath",
+    "PDF data validation PDF": "pdfDataValidationPdfPath",
     "Text": "textPath",
     "Design check matrix Excel": "designCheckMatrixExcelPath",
     "Data validation check matrix Excel": "dataValidationCheckMatrixExcelPath",
@@ -3095,6 +3081,7 @@ async function runExcelOnlyDataDesignReview(config, files, startedAt) {
   const hierarchyValidation = buildExcelOnlyHierarchyValidation(excelProfiles);
   const hierarchyEvidenceRows = hierarchyEvidenceRowsFromValidation(hierarchyValidation);
   const comparison = buildExcelOnlyComparison(excelProfiles, hierarchyValidation);
+  const pairwiseComparisonDetails = buildExcelOnlyPairwiseDetails(comparison);
   const designRows = buildExcelOnlyDesignRows(designChecklist, excelProfiles);
   const dataRows = buildExcelOnlyDataRows(dataChecklist, excelProfiles, comparison, hierarchyValidation);
   const designCounts = statusCountsFromMatrixRows(designRows);
@@ -3113,7 +3100,17 @@ async function runExcelOnlyDataDesignReview(config, files, startedAt) {
       name: "excel_file_data_design_review_agent",
       mode: selectedExcels.length > 1 ? "excel_file_cross_report_data_design_validation" : "excel_file_single_report_data_design_validation",
       review_timestamp: reviewTimestamp,
-      data_validation_source: "Selected Excel workbook(s) only; PDF files are not required or used."
+      data_validation_source: "Selected Excel workbook(s) only; PDF files are not required or used.",
+      features: [
+        "Excel-only design and data validation",
+        "Selected Excel workbook input only; PDF files not required",
+        "Checklist-driven design review",
+        "Checklist-driven Excel data validation",
+        "Cross-Excel report comparison within matching validation groups",
+        "SAIFI/SAIDI hierarchy rollup validation where matching levels are selected",
+        "Report-wise observations with evidence",
+        "Timestamped Markdown, PDF, JSON, text, and Excel matrix artifacts"
+      ]
     },
     project: {
       project_name: config.projectName || projectSlug,
@@ -3185,9 +3182,13 @@ async function runExcelOnlyDataDesignReview(config, files, startedAt) {
       })
     },
     excel_data_validation: {
+      state: comparison.mismatchRows.length ? "mismatch" : comparison.matchRows.length ? "match" : "insufficient_context",
+      pair_count: pairwiseComparisonDetails.length,
       match_count: comparison.matchRows.length + Number(hierarchyValidation.match_count || 0),
       mismatch_count: comparison.mismatchRows.length + Number(hierarchyValidation.mismatch_count || 0),
+      insufficient_context_pair_count: pairwiseComparisonDetails.filter((pair) => !(pair.comparisons || []).length).length,
       evidence_rows: [...hierarchyEvidenceRows, ...comparison.mismatchRows, ...comparison.matchRows].slice(0, 200),
+      pairwise: pairwiseComparisonDetails,
       validation_groups: comparison.groups,
       skipped_groups: comparison.skippedGroups,
       skipped_cross_family_pair_count: comparison.skippedCrossFamilyPairCount,
@@ -4422,6 +4423,75 @@ function buildExcelOnlyComparison(profiles, hierarchyValidation = null) {
   };
 }
 
+function buildExcelOnlyPairwiseDetails(comparison = {}) {
+  const pairMap = new Map();
+  const comparisonRows = [...(comparison.mismatchRows || []), ...(comparison.matchRows || [])];
+
+  for (const row of comparisonRows) {
+    const leftReport = excelOnlyComparisonReportName(row.left_report, row.excel, "Report 1");
+    const rightReport = excelOnlyComparisonReportName(row.right_report, row.pdf, "Report 2");
+    const groupName = row.validation_group || row.groupName || "Cross-Excel";
+    const key = `${groupName}\u0000${leftReport}\u0000${rightReport}`;
+    if (!pairMap.has(key)) {
+      pairMap.set(key, {
+        group: groupName,
+        left_report: leftReport,
+        right_report: rightReport,
+        state: "match",
+        evidence: "",
+        comparisons: []
+      });
+    }
+    const pair = pairMap.get(key);
+    const state = String(row.status || "").toLowerCase();
+    if (state.includes("mismatch") || state.includes("not ok")) pair.state = "mismatch";
+    pair.comparisons.push({
+      source: row.source || row.validation_group || "cross_excel_comparison",
+      row_label: row.row_label || row.sheet_name || "-",
+      metric: row.metric || row.metric_key || "-",
+      left_display_value: row.left_value ?? excelOnlyComparisonValue(row.excel),
+      right_display_value: row.right_value ?? excelOnlyComparisonValue(row.pdf),
+      state: row.status || "-"
+    });
+  }
+
+  for (const skippedGroup of comparison.skippedGroups || []) {
+    const reports = Array.isArray(skippedGroup.reports) ? skippedGroup.reports.filter(Boolean) : [];
+    for (let leftIndex = 0; leftIndex < reports.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < reports.length; rightIndex += 1) {
+        const leftReport = reports[leftIndex];
+        const rightReport = reports[rightIndex];
+        const groupName = skippedGroup.group || "Cross-Excel";
+        const key = `${groupName}\u0000${leftReport}\u0000${rightReport}`;
+        if (pairMap.has(key)) continue;
+        pairMap.set(key, {
+          group: groupName,
+          left_report: leftReport,
+          right_report: rightReport,
+          state: "insufficient_context",
+          evidence: skippedGroup.reason || "No detailed comparisons were available.",
+          comparisons: []
+        });
+      }
+    }
+  }
+
+  return [...pairMap.values()];
+}
+
+function excelOnlyComparisonReportName(explicitName, valueWithName, fallback) {
+  const explicit = String(explicitName || "").trim();
+  if (explicit) return explicit;
+  const parsed = String(valueWithName || "").split(":")[0]?.trim();
+  return parsed || fallback;
+}
+
+function excelOnlyComparisonValue(valueWithName) {
+  const text = String(valueWithName || "");
+  const separatorIndex = text.indexOf(":");
+  return separatorIndex >= 0 ? text.slice(separatorIndex + 1).trim() : text || "-";
+}
+
 function compareExcelProfilesWithinGroup(groupName, profiles) {
   const byMetric = new Map();
   for (const profile of profiles) {
@@ -4705,12 +4775,15 @@ function buildExcelOnlyDesignRows(checklist, profiles) {
 
 function buildExcelOnlyDataRows(checklist, profiles, comparison, hierarchyValidation = null) {
   if (!checklist?.available) return missingChecklistSectionRows(checklist, profiles, "Excel Data");
-  const checklistPoints = checklist.points.length ? checklist.points : [
+  const checklistPoints = filterDataChecklistPointsForSelectedReports(
+    checklist.points.length ? checklist.points : [
     { section: "Excel Data", text: "Workbook has readable data rows." },
     { section: "Excel Data", text: "No formula error values are present." },
     { section: "Excel Data", text: "Common metrics match across selected Excel reports." },
     { section: "Excel Data", text: "Date or period value is detectable in selected Excel report." }
-  ];
+    ],
+    profiles
+  );
   return checklistPoints.slice(0, 120).map((point, index) => {
     const statuses = {};
     for (const profile of profiles) {
@@ -4729,6 +4802,39 @@ function buildExcelOnlyDataRows(checklist, profiles, comparison, hierarchyValida
       statuses
     };
   });
+}
+
+function filterDataChecklistPointsForSelectedReports(points, profiles = []) {
+  const selectedFamilies = new Set(
+    profiles
+      .map((profile) => dataValidationFamilyKey(profile.validationGroup || inferExcelReportValidationGroup(profile.file?.name || "")))
+      .filter(Boolean)
+  );
+  if (!selectedFamilies.size || selectedFamilies.has("mixed")) return points;
+
+  return points.filter((point) => {
+    const pointFamily = dataChecklistPointFamily(point);
+    return pointFamily === "generic" || selectedFamilies.has(pointFamily);
+  });
+}
+
+function dataValidationFamilyKey(value) {
+  const text = cleanCellText(value).toLowerCase();
+  if (/\bsaifi\b|\bsaidi\b/.test(text)) return "saifi_saidi";
+  if (/\banalog\b/.test(text)) return "analog";
+  if (!text || text === "generic") return "";
+  return "mixed";
+}
+
+function dataChecklistPointFamily(point) {
+  const text = cleanCellText(`${point?.section || ""} ${point?.text || ""}`).toLowerCase();
+  if (/\bsaifi\b|\bsaidi\b/.test(text)) return "saifi_saidi";
+  if (isAnalogDataChecklistPoint(text)) return "analog";
+  return "generic";
+}
+
+function isAnalogDataChecklistPoint(text) {
+  return /\b(?:analog|vry|vyb|vbr|ir|iy|ib|voltage|current|power\s*factor|pf|mva|mvar|mw|md|mwh|energy\s+import|energy\s+export|frequency|transformer|capacitor|cap\s*bank|apparent\s+power|active\s+power|reactive\s+power)\b/i.test(text);
 }
 
 function missingChecklistSectionRows(checklist, profiles, section) {
@@ -5077,6 +5183,24 @@ function writeMatrixWorkbook(filePath, rows, selectedExcels) {
   XLSX.writeFile(workbook, filePath);
 }
 
+const EXCEL_ONLY_AGENT_FEATURES = [
+  "Excel-only design and data validation",
+  "Selected Excel workbook input only; PDF files not required",
+  "Checklist-driven design review",
+  "Checklist-driven Excel data validation",
+  "Cross-Excel report comparison within matching validation groups",
+  "SAIFI/SAIDI hierarchy rollup validation where matching levels are selected",
+  "Report-wise observations with evidence",
+  "Timestamped Markdown, PDF, JSON, text, and Excel matrix artifacts"
+];
+
+function excelOnlyAgentFeaturesText(result) {
+  const features = Array.isArray(result?.agent?.features) && result.agent.features.length
+    ? result.agent.features
+    : EXCEL_ONLY_AGENT_FEATURES;
+  return features.join(", ");
+}
+
 function excelOnlyReviewMarkdown(result) {
   const designCounts = okNotOkNaCounts(result.design_summary.counts);
   const dataCounts = matrixCounts(result.data_validation_check_matrix);
@@ -5089,6 +5213,7 @@ function excelOnlyReviewMarkdown(result) {
     "## Agent Details",
     `Agent Name: ${result.agent.name}`,
     `Agent Mode: ${result.agent.mode}`,
+    `Agent Features: ${excelOnlyAgentFeaturesText(result)}`,
     `Reviewer Name: ${result.project.reviewer_name || "-"}`,
     `Review Timestamp: ${result.agent.review_timestamp}`,
     "",
@@ -5137,6 +5262,7 @@ function excelOnlyDesignReviewMarkdown(result) {
     "## Agent Details",
     `Agent Name: ${result.agent.name}`,
     `Agent Mode: ${result.agent.mode}`,
+    `Agent Features: ${excelOnlyAgentFeaturesText(result)}`,
     `Reviewer Name: ${result.project.reviewer_name || "-"}`,
     `Review Timestamp: ${result.agent.review_timestamp}`,
     "",
@@ -5190,6 +5316,7 @@ function excelOnlyDataValidationMarkdown(result) {
     "## Agent Details",
     `Agent Name: ${result.agent.name}`,
     `Agent Mode: ${result.agent.mode}`,
+    `Agent Features: ${excelOnlyAgentFeaturesText(result)}`,
     `Reviewer Name: ${result.project.reviewer_name || "-"}`,
     `Review Timestamp: ${result.agent.review_timestamp}`,
     "",
@@ -5235,6 +5362,11 @@ function excelOnlyDataValidationMarkdown(result) {
         ]
       : []),
     "",
+    "## Cross-Excel Pair Detail",
+    "This section lists every generated cross-Excel comparison for each pair, including matching and mismatching bucket/metric checks.",
+    "",
+    ...excelOnlyPairDetailMarkdownBlocks(result),
+    "",
     "## Data Checklist Findings",
     dataFindingRows.length
       ? "The following data checklist points need correction, evidence, or reviewer attention."
@@ -5251,6 +5383,30 @@ function excelOnlyDataValidationMarkdown(result) {
       : [])
   ];
   return `${lines.join("\n")}\n`;
+}
+
+function excelOnlyPairDetailMarkdownBlocks(result) {
+  const pairwise = result.excel_data_validation?.pairwise || [];
+  if (!pairwise.length) {
+    return ["No cross-Excel pair detail was produced for the selected reports."];
+  }
+  return pairwise.flatMap((pair) => {
+    const comparisons = pair.comparisons || [];
+    return [
+      `### ${pair.left_report || "Report 1"} vs ${pair.right_report || "Report 2"}`,
+      "",
+      ...(comparisons.length
+        ? [
+            `| Source | Row Label | Metric | ${escapePipes(pair.left_report || "Report 1")} Value | ${escapePipes(pair.right_report || "Report 2")} Value | State |`,
+            "| --- | --- | --- | --- | --- | --- |",
+            ...comparisons.slice(0, 500).map((comparison) =>
+              `| ${escapePipes(comparison.source || "-")} | ${escapePipes(comparison.row_label || "-")} | ${escapePipes(comparison.metric || "-")} | ${escapePipes(comparison.left_display_value ?? "-")} | ${escapePipes(comparison.right_display_value ?? "-")} | ${escapePipes(comparison.state || pair.state || "-")} |`
+            )
+          ]
+        : [pair.evidence || "No detailed comparisons were available."]),
+      ""
+    ];
+  });
 }
 
 function hierarchyMarkdownRows(hierarchyValidation) {
@@ -5348,6 +5504,8 @@ async function writeMarkdownPdf(pdfPath, markdown, title) {
         "--disable-gpu",
         "--no-first-run",
         "--disable-extensions",
+        "--no-pdf-header-footer",
+        "--print-to-pdf-no-header",
         `--print-to-pdf=${pdfPath}`,
         pathToFileURL(htmlPath).href
       ], { windowsHide: true, timeout: 120000 });
@@ -5363,11 +5521,10 @@ async function writeMarkdownPdf(pdfPath, markdown, title) {
 async function writeMarkdownPdfWithPdfLib(pdfPath, markdown, title) {
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
   const pdfDoc = await PDFDocument.create();
-  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regular = await pdfDoc.embedFont(StandardFonts.Courier);
   const margin = 42;
-  const fontSize = 9;
-  const lineHeight = 13;
+  const fontSize = 8;
+  const lineHeight = 11;
   let page = pdfDoc.addPage([595.28, 841.89]);
   let y = page.getHeight() - margin;
 
@@ -5377,33 +5534,47 @@ async function writeMarkdownPdfWithPdfLib(pdfPath, markdown, title) {
   };
   const drawLine = (text, options = {}) => {
     if (y < margin) addPage();
-    const font = options.bold ? bold : regular;
     page.drawText(text, {
       x: margin,
       y,
       size: options.size || fontSize,
-      font,
+      font: regular,
       color: options.color || rgb(0.08, 0.12, 0.2)
     });
     y -= options.lineHeight || lineHeight;
   };
 
-  drawLine(title || "DA Review", { bold: true, size: 16, lineHeight: 22, color: rgb(0, 0.23, 0.36) });
-  for (const sourceLine of markdownToPdfLines(markdown, 105)) {
-    if (!sourceLine) {
-      y -= 5;
+  for (const sourceLine of markdownToVerbatimPdfLines(markdown, 95)) {
+    if (sourceLine === "") {
+      y -= lineHeight;
       continue;
     }
-    const heading = sourceLine.match(/^(#{1,3})\s+(.*)$/);
-    if (heading) {
-      y -= 4;
-      drawLine(heading[2], { bold: true, size: heading[1].length === 1 ? 13 : 11, lineHeight: 17, color: rgb(0.05, 0.16, 0.28) });
-      continue;
-    }
-    drawLine(sourceLine.replace(/\*\*/g, ""));
+    drawLine(sourceLine);
   }
   await ensureDir(path.dirname(pdfPath));
   await fsp.writeFile(pdfPath, await pdfDoc.save());
+}
+
+function markdownToVerbatimPdfLines(markdown, width) {
+  const lines = [];
+  for (const rawLine of String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n")) {
+    if (!rawLine) {
+      lines.push("");
+      continue;
+    }
+    lines.push(...wrapPdfLineVerbatim(rawLine, width));
+  }
+  return lines;
+}
+
+function wrapPdfLineVerbatim(line, width) {
+  const value = String(line || "");
+  if (value.length <= width) return [value];
+  const lines = [];
+  for (let index = 0; index < value.length; index += width) {
+    lines.push(value.slice(index, index + width));
+  }
+  return lines;
 }
 
 function markdownToPdfLines(markdown, width) {
@@ -5458,34 +5629,90 @@ async function resolveChromeExecutable() {
 }
 
 function markdownDocumentHtml(markdown, title) {
+  const bodyHtml = markdownToHtml(String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>${escapeHtml(title)}</title>
   <style>
-    @page { margin: 18mm 14mm; }
+    @page { size: A4 landscape; margin: 11mm 9mm; }
     body {
       color: #0f172a;
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 12px;
-      line-height: 1.45;
+      font-size: 8.5px;
+      line-height: 1.28;
     }
-    h1 { font-size: 22px; margin: 0 0 14px; color: #003b5c; }
-    h2 { font-size: 16px; margin: 20px 0 8px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; color: #0f172a; }
-    h3 { font-size: 13px; margin: 14px 0 6px; }
-    p { margin: 6px 0; }
-    ul, ol { margin: 6px 0 8px 20px; padding: 0; }
-    li { margin: 3px 0; }
-    table { border-collapse: collapse; margin: 8px 0 14px; width: 100%; table-layout: fixed; page-break-inside: auto; }
-    th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
-    th { background: #eef2f7; color: #102033; font-weight: 700; }
-    tr { page-break-inside: avoid; }
-    code { background: #f1f5f9; border-radius: 3px; padding: 1px 3px; }
+    h1 {
+      font-size: 17px;
+      margin: 0 0 8px;
+      color: #0b3558;
+    }
+    h2 {
+      border-bottom: 1px solid #b6c2cf;
+      color: #0b3558;
+      font-size: 13px;
+      margin: 13px 0 7px;
+      padding-bottom: 3px;
+    }
+    h3 {
+      color: #0b3558;
+      font-size: 10.5px;
+      margin: 10px 0 5px;
+    }
+    h4,
+    h5,
+    h6 {
+      color: #164e63;
+      font-size: 9px;
+      margin: 8px 0 4px;
+    }
+    p {
+      margin: 4px 0 6px;
+    }
+    ul {
+      margin: 4px 0 7px 18px;
+      padding: 0;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 6px 0 11px;
+      table-layout: fixed;
+      width: 100%;
+      page-break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    tr {
+      page-break-inside: auto;
+      page-break-after: auto;
+    }
+    th,
+    td {
+      border: 1px solid #b8c2cc;
+      overflow-wrap: anywhere;
+      padding: 4px 5px;
+      text-align: left;
+      vertical-align: top;
+      white-space: normal;
+    }
+    th {
+      background: #e8f0f7;
+      color: #082f49;
+      font-weight: 700;
+    }
+    tbody tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.94em;
+    }
   </style>
 </head>
 <body>
-${markdownToHtml(markdown)}
+${bodyHtml}
 </body>
 </html>`;
 }
@@ -5529,7 +5756,7 @@ function markdownToHtml(markdown) {
       continue;
     }
 
-    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
     if (heading) {
       if (listOpen) {
         output.push("</ul>");
@@ -5569,6 +5796,7 @@ function splitMarkdownTableRow(row) {
 
 function inlineMarkdown(value) {
   return escapeHtml(value)
+    .replace(/&lt;br\s*\/?&gt;/gi, "<br>")
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 }
@@ -5772,6 +6000,12 @@ async function finalizeExcelPdfProjectArtifacts({ parsed, config, runPlan, stdou
     copied[outputKey] = relativePath(AI_REVIEW_ROOT, targetPath);
   }
 
+  await ensureExcelPdfReviewPdfCompanions({
+    copied,
+    projectOutputFolderAbs,
+    projectName: config.projectName || projectSlug
+  });
+
   const summaryPath = await uniqueReviewArtifactPath(projectOutputFolderAbs, `${projectFolder}-ui-run-summary.json`, runPlan.runId);
   await writeJson(summaryPath, {
     ...metadata,
@@ -5792,6 +6026,48 @@ async function finalizeExcelPdfProjectArtifacts({ parsed, config, runPlan, stdou
     copiedArtifacts: copied,
     summaryPath: relativePath(AI_REVIEW_ROOT, summaryPath)
   };
+}
+
+async function ensureExcelPdfReviewPdfCompanions({ copied, projectOutputFolderAbs, projectName }) {
+  const companions = [
+    {
+      markdownKey: "design_markdown",
+      pdfKey: "design_pdf",
+      title: `${projectName || "DA Review"} - Design Review`
+    },
+    {
+      markdownKey: "excel_data_validation_markdown",
+      pdfKey: "excel_data_validation_pdf",
+      title: `${projectName || "DA Review"} - Excel Data Validation`
+    },
+    {
+      markdownKey: "pdf_data_validation_markdown",
+      pdfKey: "pdf_data_validation_pdf",
+      title: `${projectName || "DA Review"} - PDF Data Validation`
+    }
+  ];
+
+  for (const companion of companions) {
+    if (copied[companion.pdfKey] || !copied[companion.markdownKey]) continue;
+    const markdownPath = path.resolve(AI_REVIEW_ROOT, copied[companion.markdownKey]);
+    if (path.extname(markdownPath).toLowerCase() !== ".md" || !fs.existsSync(markdownPath)) continue;
+    const pdfPath = await reviewPdfCompanionPath(projectOutputFolderAbs, markdownPath);
+    const markdown = await readText(markdownPath);
+    await writeMarkdownPdf(pdfPath, markdown, companion.title);
+    copied[companion.pdfKey] = relativePath(AI_REVIEW_ROOT, pdfPath);
+  }
+}
+
+async function reviewPdfCompanionPath(folderPath, markdownPath) {
+  const parsed = path.parse(path.basename(markdownPath));
+  const safeName = safeFileName(parsed.name || "review-file");
+  let candidate = path.join(folderPath, `${safeName}.pdf`);
+  let suffix = 1;
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(folderPath, `${safeName}-${suffix}.pdf`);
+    suffix += 1;
+  }
+  return candidate;
 }
 
 async function uniqueReviewArtifactPath(folderPath, sourcePathOrName, runId) {

@@ -1667,6 +1667,11 @@ function MultiFileSelection({
   const triggerMeta = files.length === 0 ? "0 files" : selectedCount > 0 ? `${selectedCount} of ${files.length} selected` : "";
   const triggerStateClass = selectedCount > 0 ? "has-selection" : "empty-selection";
 
+  function selectPath(pathValue: string) {
+    onToggle(pathValue);
+    setOpen(false);
+  }
+
   useEffect(() => {
     if (!open) return;
 
@@ -1680,13 +1685,13 @@ function MultiFileSelection({
       if (event.key === "Escape") setOpen(false);
     }
 
-    document.addEventListener("mousedown", closeWhenOutside);
-    document.addEventListener("touchstart", closeWhenOutside);
+    document.addEventListener("click", closeWhenOutside);
+    document.addEventListener("touchend", closeWhenOutside);
     document.addEventListener("keydown", closeOnEscape);
 
     return () => {
-      document.removeEventListener("mousedown", closeWhenOutside);
-      document.removeEventListener("touchstart", closeWhenOutside);
+      document.removeEventListener("click", closeWhenOutside);
+      document.removeEventListener("touchend", closeWhenOutside);
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [open]);
@@ -1708,12 +1713,12 @@ function MultiFileSelection({
       {open && (
         <div className="multi-file-menu">
           <label className={`multi-file-option all ${allSelected ? "selected" : ""}`}>
-            <input checked={allSelected} disabled={files.length === 0} type="checkbox" onChange={() => onToggle("__all__")} />
+            <input checked={allSelected} disabled={files.length === 0} type="checkbox" onChange={() => selectPath("__all__")} />
             <span>{allLabel}</span>
           </label>
           {files.map((file) => (
             <label className={`multi-file-option ${selectedPaths.includes(file.path) ? "selected" : ""}`} key={file.path}>
-              <input checked={selectedPaths.includes(file.path)} type="checkbox" onChange={() => onToggle(file.path)} />
+              <input checked={selectedPaths.includes(file.path)} type="checkbox" onChange={() => selectPath(file.path)} />
               <span>{file.name}</span>
             </label>
           ))}
