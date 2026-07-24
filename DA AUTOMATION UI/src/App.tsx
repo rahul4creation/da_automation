@@ -780,8 +780,10 @@ export default function App() {
           <div className="workflow-grid">
             <section className="phase-workbench">
               <PhaseHeader phase={activePhase} project={project} />
-              {activePhase.id === "05-ai-review-validation" ? (
-                <>
+              {activePhase.id === defaultReviewPhaseId ? (
+                isGrafanaPlatform(project.targetPlatform) ? (
+                  <DashboardReviewPlaceholder project={project} />
+                ) : (
                   <ExcelPdfReviewApp
                     embedded
                     defaultProjectName={project.projectName || project.projectId}
@@ -789,7 +791,7 @@ export default function App() {
                     username={currentUsername}
                     userType={currentUserType}
                   />
-                </>
+                )
               ) : (
                 <>
                   <NextStepPanel
@@ -1385,12 +1387,13 @@ function QuestionnairePanel({
 }
 
 function PhaseHeader({ phase, project }: { phase: Phase; project: ProjectDetail }) {
+  const title = reviewPhaseTitle(phase, project.targetPlatform);
   return (
     <>
       <section className="phase-header">
         <div>
           <span className="eyebrow">Phase {phase.number}</span>
-          <h3>{phase.title}</h3>
+          <h3>{title}</h3>
           <p>{phase.artifactPath}</p>
         </div>
         <div className="phase-status-stack">
@@ -1399,12 +1402,12 @@ function PhaseHeader({ phase, project }: { phase: Phase; project: ProjectDetail 
           <small>{project.owner || "Owner TBD"}</small>
         </div>
       </section>
-      {phase.id === "05-ai-review-validation" && <ReviewAgentInfo />}
+      {phase.id === defaultReviewPhaseId && !isGrafanaPlatform(project.targetPlatform) && <ReviewAgentInfo project={project} />}
     </>
   );
 }
 
-function ReviewAgentInfo() {
+function ReviewAgentInfo({ project }: { project: ProjectDetail }) {
   const features = [
     "Checklist-driven Excel design review",
     "Selected Excel report data validation",
@@ -1417,12 +1420,24 @@ function ReviewAgentInfo() {
     <section className="review-agent-info">
       <div className="review-agent-info-main">
         <span className="eyebrow">Agent Name</span>
-        <strong>Excel Data and Design Review Agent</strong>
+        <strong>{isFlexReportPlatform(project.targetPlatform) ? "AI Report Review and Validation" : "Excel Data and Design Review Agent"}</strong>
       </div>
       <div className="review-agent-feature-list">
         {features.map((feature) => (
           <span key={feature}>{feature}</span>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
+  return (
+    <section className="dashboard-review-placeholder">
+      <div className="dashboard-review-empty-state">
+        <span className="eyebrow">Current Packet</span>
+        <h3>AI Dashboard Review and Validation</h3>
+        <p>{project.projectName || project.projectId}</p>
       </div>
     </section>
   );
@@ -1696,6 +1711,25 @@ function visibleAgentOutput(value?: string) {
     .replace(/## Quality Checks From Review Files[\s\S]*?(?=\r?\n## |\s*$)/gi, "")
     .replace(/## Data Quality Checks Needed[\s\S]*?(?=\r?\n## |\s*$)/gi, "")
     .trim() || "No output yet.";
+}
+
+function reviewPhaseTitle(phase: Phase, targetPlatform: string) {
+  if (phase.id !== defaultReviewPhaseId) return phase.title;
+  if (isGrafanaPlatform(targetPlatform)) return "AI Dashboard Review and Validation";
+  if (isFlexReportPlatform(targetPlatform)) return "AI Report Review and Validation";
+  return phase.title;
+}
+
+function isGrafanaPlatform(value: string) {
+  return normalizePlatform(value) === "grafana";
+}
+
+function isFlexReportPlatform(value: string) {
+  return normalizePlatform(value) === "flexreport";
+}
+
+function normalizePlatform(value: string) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function statusClass(status: GateRow["status"]) {
