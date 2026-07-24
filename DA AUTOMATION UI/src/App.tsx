@@ -13,7 +13,6 @@ import {
   RefreshCw,
   Save,
   ShieldCheck,
-  Trash2,
   Upload,
   UserPlus,
   UserRound,
@@ -28,7 +27,6 @@ import {
   PhaseDefinition,
   ProjectDetail,
   ProjectSummary,
-  apiDelete,
   apiGet,
   apiPost,
   apiPut
@@ -354,7 +352,6 @@ export default function App() {
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
-  const [projectRenameDrafts, setProjectRenameDrafts] = useState<Record<string, string>>({});
   const [phaseRenameDrafts, setPhaseRenameDrafts] = useState<Record<string, string>>({});
   const [createForm, setCreateForm] = useState({
     projectName: "",
@@ -371,18 +368,6 @@ export default function App() {
       null,
     [project, activePhaseId]
   );
-
-  const selectedProjectSummary = useMemo(
-    () => projects.find((item) => item.projectId === selectedProjectId) || null,
-    [projects, selectedProjectId]
-  );
-  const selectedProjectDraftName = selectedProjectSummary
-    ? projectRenameDrafts[selectedProjectSummary.projectId] ?? selectedProjectSummary.projectName
-    : "";
-  const selectedProjectRenameChanged =
-    selectedProjectSummary !== null &&
-    selectedProjectDraftName.trim().length > 0 &&
-    selectedProjectDraftName.trim() !== selectedProjectSummary.projectName;
 
   useEffect(() => {
     if (!authenticated) {
@@ -579,29 +564,6 @@ export default function App() {
     }
   }
 
-  async function saveProjectRename(item: ProjectSummary) {
-    const projectName = (projectRenameDrafts[item.projectId] ?? item.projectName).trim();
-    if (!projectName || projectName === item.projectName) return;
-    try {
-      setBusy(true);
-      const { project: updated } = await apiPut<{ project: ProjectDetail }>(`/api/projects/${item.projectId}`, withActorBody({ projectName }));
-      setProjects((current) =>
-        current
-          .map((projectItem) => (projectItem.projectId === item.projectId ? { ...projectItem, projectName: updated.projectName } : projectItem))
-          .sort((left, right) => left.projectName.localeCompare(right.projectName))
-      );
-      setProjectRenameDrafts((current) => ({ ...current, [item.projectId]: updated.projectName }));
-      if (selectedProjectId === item.projectId) {
-        setProject(updated);
-      }
-      setToast({ type: "success", message: `Project renamed to ${updated.projectName}` });
-    } catch (error) {
-      showError(error);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function savePhaseRename(phase: Phase) {
     if (!project) return;
     const title = (phaseRenameDrafts[phase.id] ?? phase.title).trim();
@@ -616,31 +578,6 @@ export default function App() {
       setPhaseRenameDrafts((current) => ({ ...current, [phase.id]: title }));
       await refreshProjects();
       setToast({ type: "success", message: `Phase renamed to ${title}` });
-    } catch (error) {
-      showError(error);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function moveProjectToTrash(item: ProjectSummary) {
-    const confirmed = window.confirm(
-      `Move "${item.projectName}" to trash?\n\nThe project will be removed from the active list, but the files will stay under projects/_trash.`
-    );
-    if (!confirmed) return;
-
-    try {
-      setBusy(true);
-      const result = await apiDelete<{ trashPath: string }>(withActorQuery(`/api/projects/${item.projectId}`));
-      if (selectedProjectId === item.projectId) {
-        setSelectedProjectId("");
-        setProject(null);
-        setActivePhaseId("");
-        setNotes("");
-        setQuestionAnswers({});
-      }
-      await refreshProjects();
-      setToast({ type: "success", message: `${item.projectName} moved to trash: ${result.trashPath}` });
     } catch (error) {
       showError(error);
     } finally {
@@ -812,47 +749,6 @@ export default function App() {
               </option>
             ))}
           </select>
-          {selectedProjectSummary && (
-            <div className="project-selected-actions">
-              <div className="project-selected-edit">
-                <input
-                  aria-label={`Rename ${selectedProjectSummary.projectName}`}
-                  onChange={(event) =>
-                    setProjectRenameDrafts((current) => ({
-                      ...current,
-                      [selectedProjectSummary.projectId]: event.target.value
-                    }))
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void saveProjectRename(selectedProjectSummary);
-                    }
-                  }}
-                  value={selectedProjectDraftName}
-                />
-                <small>{selectedProjectSummary.projectId}</small>
-              </div>
-              <button
-                className="icon-btn"
-                onClick={() => void saveProjectRename(selectedProjectSummary)}
-                disabled={busy || !selectedProjectRenameChanged}
-                title={`Save ${selectedProjectSummary.projectName} name`}
-                aria-label={`Save ${selectedProjectSummary.projectName} name`}
-              >
-                <Save size={15} />
-              </button>
-              <button
-                className="icon-btn danger-icon"
-                onClick={() => void moveProjectToTrash(selectedProjectSummary)}
-                disabled={busy}
-                title={`Move ${selectedProjectSummary.projectName} to trash`}
-                aria-label={`Move ${selectedProjectSummary.projectName} to trash`}
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-          )}
           {projects.length === 0 && <div className="empty-note">No projects yet</div>}
         </div>
       </aside>

@@ -20,6 +20,7 @@ env/
 # Logs and temporary output
 *.log
 *.err
+*.lock
 tmp/
 temp/
 
@@ -51,4 +52,8 @@ DA AUTOMATION UI/release*/
 DA AUTOMATION UI/projects/
 DA AUTOMATION UI/*.rar
 DA AUTOMATION UI/docs/user-password-export/
+
+# Local runtime duplicate; source changes are committed from DA AUTOMATION UI/
+DA AUTOMATION UI LIVE DUPLICATE/
+
 ~$*.xlsx

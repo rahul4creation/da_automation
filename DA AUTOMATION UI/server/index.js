@@ -981,8 +981,24 @@ app.post("/api/projects/:projectId/phases/:phaseId/complete", async (req, res, n
 });
 
 if (fs.existsSync(DIST_ROOT)) {
-  app.use(express.static(DIST_ROOT));
+  const sendNoCacheHeaders = (res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  };
+  app.use(
+    express.static(DIST_ROOT, {
+      etag: false,
+      lastModified: false,
+      setHeaders: sendNoCacheHeaders
+    })
+  );
+  app.get(/^\/assets\//, (req, res) => {
+    sendNoCacheHeaders(res);
+    res.status(404).send("Asset not found");
+  });
   app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
+    sendNoCacheHeaders(res);
     res.sendFile(path.join(DIST_ROOT, "index.html"));
   });
 }
@@ -1764,7 +1780,7 @@ function withChecklistRevision(file) {
     revisionMinor: revision.minor,
     revisionNumber: checklistRevisionSortValue(revision),
     revisionLabel,
-    displayName: `Generic Checklist (${revisionLabel})`
+    displayName: file.name
   };
 }
 

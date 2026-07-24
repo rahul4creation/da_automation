@@ -296,6 +296,14 @@ type CorrectionObservation = {
   correctionRequired?: string;
 };
 
+type CorrectionObservationMatrixRow = {
+  key: string;
+  sNo: string;
+  checkPoint: string;
+  reportStates: Record<string, string>;
+  remarks: string[];
+};
+
 const defaultConfig: AgentConfig = {
   checklistInput: "",
   excelFolder: "",
@@ -466,11 +474,6 @@ export default function ExcelPdfReviewApp({ username, userType = "User", default
     [activeCheckIds, reviewSummary]
   );
   const displayedEvidenceRows = reviewSummary?.evidenceRows?.length ? reviewSummary.evidenceRows : [];
-  const individualVerificationGroups = reviewSummary?.individualChecklistVerifications || [];
-  const individualVerificationRowCount = individualVerificationGroups.reduce(
-    (sum, group) => sum + (group.rows?.length || 0),
-    0
-  );
   const correctionObservations = reviewSummary?.correctionObservations || [];
   const dataCorrectionObservations = useMemo(
     () => correctionObservations.filter((observation) => !isDesignCorrectionObservation(observation)),
@@ -841,7 +844,7 @@ export default function ExcelPdfReviewApp({ username, userType = "User", default
       setEditorChecklistPath(result.createdFile.path);
       setEditorChecklistInput(parentFolderFromPath(result.createdFile.path));
       setChecklistRevisionStatus(
-        `Generic Checklist saved as ${result.revisionLabel}; ${result.saved.updatedCount || editableRows.length} row(s) saved.`
+        `Checklist saved as ${fileNameFromPath(result.createdFile.path)} (${result.revisionLabel}); ${result.saved.updatedCount || editableRows.length} row(s) saved.`
       );
       clearReviewOutput();
     } catch (error) {
@@ -1462,30 +1465,6 @@ export default function ExcelPdfReviewApp({ username, userType = "User", default
             </div>
           </section>
 
-          <section className="review-panel individual-verification-panel" id="individual-checklist-verification">
-            <div className="review-panel-header">
-              <div className="section-title">
-                <ClipboardCheck size={16} />
-                <span>Individual Checklist Verification</span>
-              </div>
-              <span className="gate-count-pill">
-                {individualVerificationRowCount} report checks
-              </span>
-            </div>
-            <div className="findings-count-note">
-              Each row is one selected report verified against one checklist point. Cross-report verification remains available in the matrix and correction sections.
-            </div>
-            {individualVerificationGroups.length ? (
-              <div className="individual-verification-groups">
-                {individualVerificationGroups.map((group) => (
-                  <IndividualVerificationGroup group={group} key={group.id || group.title} />
-                ))}
-              </div>
-            ) : (
-              <div className="empty-note">Run or refresh the review to load individual checklist verification rows.</div>
-            )}
-          </section>
-
           <section className="review-panel correction-observations-panel" id="correction-observations">
             <div className="review-panel-header">
               <div className="section-title">
@@ -1729,56 +1708,6 @@ function MultiFileSelection({
   );
 }
 
-function IndividualVerificationGroup({ group }: { group: ChecklistVerificationGroup }) {
-  const rows = group.rows || [];
-  return (
-    <div className={`individual-verification-group ${statusClass(group.area || group.title || "review")}`}>
-      <div className="correction-observation-group-head">
-        <strong>{group.title || `${group.area || "Checklist"} Individual Checklist Verification`}</strong>
-        <span>
-          OK {group.ok || 0} | Not OK {group.notOk || 0} | NA {group.na || 0}
-        </span>
-      </div>
-      {rows.length ? (
-        <div className="correction-observation-table-wrap">
-          <table className="correction-observation-table individual-verification-table">
-            <thead>
-              <tr>
-                <th>Point</th>
-                <th>Checklist S.NO</th>
-                <th>Report</th>
-                <th>Area</th>
-                <th>State</th>
-                <th>Check Point</th>
-                <th>Evidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={`${group.id}-${row.checklistSNo || row.point}-${row.report || index}-${index}`}>
-                  <td>{row.point || index + 1}</td>
-                  <td>{row.checklistSNo || "-"}</td>
-                  <td>{row.report || "-"}</td>
-                  <td>{row.area || group.area || "-"}</td>
-                  <td>
-                    <span className={`correction-state ${statusClass(row.state || "")}`}>
-                      {row.state || "-"}
-                    </span>
-                  </td>
-                  <td>{row.checkPoint || "-"}</td>
-                  <td>{row.evidence || "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="empty-note">No individual verification rows found for this checklist group.</div>
-      )}
-    </div>
-  );
-}
-
 function CorrectionObservationGroup({
   emptyText,
   observations,
@@ -1790,6 +1719,7 @@ function CorrectionObservationGroup({
   title: string;
   tone: "data" | "design";
 }) {
+  const matrix = buildCorrectionObservationMatrix(observations);
   return (
     <div className={`correction-observation-group ${tone}`}>
       <div className="correction-observation-group-head">
@@ -1798,32 +1728,45 @@ function CorrectionObservationGroup({
       </div>
       {observations.length ? (
         <div className="correction-observation-table-wrap">
-          <table className="correction-observation-table">
+          <table className="correction-observation-table matrix-correction-table">
             <thead>
               <tr>
-                <th>Point</th>
-                <th>Checklist S.NO</th>
-                <th>Report</th>
-                <th>State</th>
-                <th>Check Point</th>
-                <th>Observation</th>
-                <th>Correction Required</th>
+                <th>S.NO</th>
+                <th>Check Points</th>
+                {matrix.reports.map((report) => (
+                  <th key={`${title}-${report}`}>{report}</th>
+                ))}
+                <th>Remarks</th>
               </tr>
             </thead>
             <tbody>
-              {observations.map((observation, index) => (
-                <tr key={`${title}-${observation.checklistSNo || observation.title}-${observation.report || index}-${index}`}>
-                  <td>{observation.point || index + 1}</td>
-                  <td>{observation.checklistSNo || "-"}</td>
-                  <td>{observation.report || "-"}</td>
+              {matrix.rows.map((row, index) => (
+                <tr key={`${title}-${row.key}-${index}`}>
+                  <td>{row.sNo || index + 1}</td>
+                  <td>{row.checkPoint || "-"}</td>
+                  {matrix.reports.map((report) => {
+                    const state = row.reportStates[report] || "";
+                    return (
+                      <td key={`${row.key}-${report}`}>
+                        {state ? (
+                          <span className={`correction-state ${statusClass(state)}`}>
+                            {state}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    );
+                  })}
                   <td>
-                    <span className={`correction-state ${statusClass(observation.state || observation.severity)}`}>
-                      {observation.state || observation.severity || "-"}
-                    </span>
+                    {row.remarks.length
+                      ? row.remarks.map((remark, remarkIndex) => (
+                          <p className="matrix-correction-remark" key={`${row.key}-remark-${remarkIndex}`}>
+                            {remarkIndex + 1}. {remark}
+                          </p>
+                        ))
+                      : "-"}
                   </td>
-                  <td>{observation.checkPoint || observation.title || "-"}</td>
-                  <td>{observation.observation || observation.detail || "-"}</td>
-                  <td>{observation.correctionRequired || observation.recommendation || "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -1834,6 +1777,47 @@ function CorrectionObservationGroup({
       )}
     </div>
   );
+}
+
+function buildCorrectionObservationMatrix(observations: CorrectionObservation[]) {
+  const reports = uniqueOrderedStrings(observations.map((observation) => observation.report || "").filter(Boolean));
+  const rows = new Map<string, CorrectionObservationMatrixRow>();
+  observations.forEach((observation, index) => {
+    const checkPoint = observation.checkPoint || observation.title || "-";
+    const sNo = String(observation.checklistSNo || observation.point || index + 1);
+    const key = `${sNo}::${normalizeMatrixKey(checkPoint)}`;
+    if (!rows.has(key)) {
+      rows.set(key, {
+        key,
+        sNo,
+        checkPoint,
+        reportStates: {},
+        remarks: []
+      });
+    }
+    const row = rows.get(key)!;
+    const report = observation.report || "Report";
+    if (!reports.includes(report)) reports.push(report);
+    row.reportStates[report] = observation.state || observation.severity || "Not OK";
+    const evidence = observation.observation || observation.detail || observation.correctionRequired || observation.recommendation || "-";
+    row.remarks.push(`${report}: ${evidence}`);
+  });
+  return { reports, rows: [...rows.values()] };
+}
+
+function uniqueOrderedStrings(values: string[]) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const trimmed = value.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeMatrixKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function PriorityPointGroup({
@@ -1983,8 +1967,7 @@ function reviewFileDisplayName(file: ReviewFile) {
   if (file.kind !== "Checklist") {
     return file.displayName || file.name;
   }
-  const revision = file.revisionLabel || (typeof file.revisionNumber === "number" ? `Rev ${file.revisionNumber}` : "");
-  return revision ? `Generic Checklist (${revision})` : "Generic Checklist";
+  return file.name || file.displayName || "Checklist";
 }
 
 function togglePath(current: string[], pathValue: string, allPaths: string[]) {
@@ -2050,6 +2033,10 @@ function samePath(left: string, right: string) {
 function parentFolderFromPath(filePath: string) {
   const index = Math.max(filePath.lastIndexOf("\\"), filePath.lastIndexOf("/"));
   return index > 0 ? filePath.slice(0, index) : "";
+}
+
+function fileNameFromPath(filePath: string) {
+  return filePath.split(/[\\/]/).pop() || filePath;
 }
 
 function checklistRevisionValue(file: ReviewFile) {

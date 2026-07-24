@@ -59,8 +59,6 @@ button {
 .eyebrow,
 .phase-header p,
 .phase-status-stack small,
-.project-row small,
-.project-selected-edit small,
 .phase-row small,
 .artifact-item small,
 .gate-table-row small,
@@ -155,7 +153,6 @@ button {
   color: #24364b;
 }
 
-.project-list,
 .phase-list,
 .artifact-list {
   display: grid;
@@ -178,39 +175,6 @@ button {
   outline: none;
 }
 
-.project-selected-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px 32px;
-  gap: 5px;
-  align-items: stretch;
-}
-
-.project-selected-edit {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  padding: 9px;
-  border: 1px solid #0b6b8f;
-  border-radius: 8px;
-  background: #e9f5f8;
-}
-
-.project-selected-edit input {
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #18212f;
-  font-weight: 800;
-  outline: none;
-}
-
-.project-selected-edit input:focus {
-  color: #0b4f6c;
-}
-
-.project-row,
 .phase-row {
   width: 100%;
   border: 1px solid transparent;
@@ -219,36 +183,6 @@ button {
   text-align: left;
 }
 
-.project-row-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px 32px;
-  gap: 5px;
-  align-items: stretch;
-}
-
-.project-row {
-  display: grid;
-  gap: 3px;
-  padding: 9px;
-  border-radius: 8px;
-}
-
-.project-row input {
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #18212f;
-  font-weight: 800;
-  outline: none;
-}
-
-.project-row input:focus {
-  color: #0b4f6c;
-}
-
-.project-row.active,
 .phase-row.active {
   border-color: #0b6b8f;
   background: #e9f5f8;
@@ -365,18 +299,6 @@ button {
 .phase-row-actions .icon-btn {
   width: 28px;
   min-height: 28px;
-  padding: 0;
-}
-
-.project-row-shell .icon-btn {
-  width: 32px;
-  min-height: 32px;
-  padding: 0;
-}
-
-.project-selected-actions .icon-btn {
-  width: 32px;
-  min-height: 32px;
   padding: 0;
 }
 
@@ -2288,36 +2210,6 @@ button {
   gap: 10px;
 }
 
-.individual-verification-panel {
-  display: grid;
-  gap: 10px;
-}
-
-.individual-verification-groups {
-  display: grid;
-  gap: 12px;
-}
-
-.individual-verification-group {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid #d7dee6;
-  border-left: 4px solid #187e5c;
-  border-radius: 8px;
-  background: #fbfefc;
-}
-
-.individual-verification-group.data {
-  border-left-color: #a36a18;
-  background: #fffdf8;
-}
-
-.individual-verification-group.design {
-  border-left-color: #0a7595;
-  background: #f8fcfe;
-}
-
 .correction-observation-groups {
   display: grid;
   gap: 12px;
@@ -2456,6 +2348,43 @@ button {
   width: 270px;
 }
 
+.matrix-correction-table {
+  min-width: 980px;
+}
+
+.matrix-correction-table th:nth-child(1),
+.matrix-correction-table td:nth-child(1) {
+  width: 64px;
+  text-align: center;
+}
+
+.matrix-correction-table th:nth-child(2),
+.matrix-correction-table td:nth-child(2) {
+  width: 280px;
+  text-align: left;
+}
+
+.matrix-correction-table th:nth-child(n + 3),
+.matrix-correction-table td:nth-child(n + 3) {
+  width: 180px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.matrix-correction-table th:last-child,
+.matrix-correction-table td:last-child {
+  width: 430px;
+  font-weight: 400;
+}
+
+.matrix-correction-remark {
+  margin: 0 0 8px;
+}
+
+.matrix-correction-remark:last-child {
+  margin-bottom: 0;
+}
+
 .correction-state {
   display: inline-flex;
   align-items: center;
@@ -2488,28 +2417,6 @@ button {
 .correction-state.not-applicable {
   background: #eef3f8;
   color: #536277;
-}
-
-.individual-verification-table th:nth-child(3),
-.individual-verification-table td:nth-child(3) {
-  width: 210px;
-}
-
-.individual-verification-table th:nth-child(4),
-.individual-verification-table td:nth-child(4),
-.individual-verification-table th:nth-child(5),
-.individual-verification-table td:nth-child(5) {
-  width: 90px;
-}
-
-.individual-verification-table th:nth-child(6),
-.individual-verification-table td:nth-child(6) {
-  width: 340px;
-}
-
-.individual-verification-table th:nth-child(7),
-.individual-verification-table td:nth-child(7) {
-  width: 360px;
 }
 
 .correction-observation-card {
