@@ -441,30 +441,175 @@ button {
 
 .dashboard-review-placeholder {
   display: grid;
-  min-height: 560px;
   border: 1px solid #d7dee6;
   border-radius: 8px;
   background: #ffffff;
 }
 
-.dashboard-review-empty-state {
+.dashboard-review-blueprint {
   display: grid;
-  align-content: start;
-  gap: 8px;
-  padding: 24px;
+  gap: 16px;
+  padding: 18px;
+  min-width: 0;
 }
 
-.dashboard-review-empty-state h3 {
+.dashboard-blueprint-head,
+.dashboard-setup-actions,
+.dashboard-button-row,
+.dashboard-inline-field,
+.dashboard-mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-blueprint-head {
+  justify-content: space-between;
+}
+
+.dashboard-blueprint-head h3 {
   margin: 0;
   color: #102033;
   font-size: 22px;
   line-height: 1.25;
 }
 
-.dashboard-review-empty-state p {
+.dashboard-blueprint-head p {
   margin: 0;
   color: #4f6074;
   font-weight: 700;
+}
+
+.dashboard-prototype-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #e7f2f5;
+  color: #0b6b8f;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.dashboard-mode-switch {
+  flex-wrap: wrap;
+}
+
+.dashboard-mode-option {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid #c6d0db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #24364b;
+  font-weight: 800;
+}
+
+.dashboard-mode-option.active {
+  border-color: #102033;
+  background: #102033;
+  color: #ffffff;
+}
+
+.dashboard-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  min-width: 0;
+}
+
+.dashboard-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.dashboard-field span {
+  color: #4b596a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dashboard-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #c6d0db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #18212f;
+  outline: none;
+}
+
+.dashboard-field input:focus {
+  border-color: #0b6b8f;
+  box-shadow: 0 0 0 3px rgba(11, 107, 143, 0.12);
+}
+
+.dashboard-field-wide {
+  grid-column: 1 / -1;
+}
+
+.dashboard-inline-field {
+  align-items: stretch;
+}
+
+.dashboard-inline-field input {
+  flex: 1 1 auto;
+}
+
+.dashboard-now-btn {
+  flex: 0 0 auto;
+}
+
+.dashboard-context-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(150px, 0.8fr) minmax(120px, 0.5fr);
+  gap: 10px;
+}
+
+.dashboard-context-strip div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid #d7dee6;
+  border-radius: 8px;
+  background: #f8fbfc;
+}
+
+.dashboard-context-strip span {
+  color: #627084;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.dashboard-context-strip strong {
+  overflow-wrap: anywhere;
+  color: #18212f;
+  font-size: 13px;
+}
+
+.dashboard-setup-actions {
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.dashboard-button-row {
+  flex-wrap: wrap;
+}
+
+.dashboard-run-status {
+  flex: 1 1 420px;
+  min-width: min(100%, 320px);
+  color: #627084;
+  line-height: 1.45;
 }
 
 .phase-guide-simple,
@@ -3562,6 +3707,8 @@ button {
 
   .gate-metrics,
   .gate-card,
+  .dashboard-context-strip,
+  .dashboard-setup-grid,
   .embedded-review-grid .review-stage-list,
   .finding-meaning-grid,
   .step-path,
@@ -3602,6 +3749,8 @@ button {
   }
 
   .input-panel-header,
+  .dashboard-blueprint-head,
+  .dashboard-setup-actions,
   .question-header,
   .gate-details summary {
     align-items: flex-start;

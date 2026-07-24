@@ -59,6 +59,8 @@ type LoginResult = {
   userType?: string;
 };
 
+type DashboardRunMode = "linked" | "fixed" | "single";
+
 type Toast = { type: "success" | "error" | "info"; message: string } | null;
 type PhaseQuestion = {
   id: string;
@@ -1432,15 +1434,246 @@ function ReviewAgentInfo({ project }: { project: ProjectDetail }) {
 }
 
 function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
+  const [runMode, setRunMode] = useState<DashboardRunMode>("linked");
+  const [form, setForm] = useState(() => ({
+    baseUrl: "https://msedclgrafana.amnex.co.in:3000",
+    mainUrl:
+      "https://msedclgrafana.amnex.co.in:3000/d/ad7931a0-0649-456f-9601-b5f7a14491b8/substation-health-monitor?orgId=1&refresh=5m",
+    validationUrl: "",
+    navigationUrl: "",
+    timeFrom: "now-1h",
+    timeTo: "now",
+    reviewTimestamp: formatDateTime(new Date())
+  }));
+  const [runStatus, setRunStatus] = useState("Sample loaded for flow preview. Run a live review to query Grafana and create fresh saved artifacts.");
+  const [running, setRunning] = useState(false);
+
+  const parsedMain = useMemo(() => parseDashboardSetupUrl(form.mainUrl, form.baseUrl), [form.mainUrl, form.baseUrl]);
+  const effectiveBaseUrl = normalizeBaseUrl(form.baseUrl || parsedMain?.baseUrl || "");
+  const readyMessage = dashboardRunReadiness(runMode, form, effectiveBaseUrl);
+
+  function updateForm(key: keyof typeof form, value: string) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function analyzeDashboardSetup() {
+    setRunStatus(readyMessage);
+  }
+
+  async function runDashboardReview() {
+    if (!form.mainUrl.trim()) {
+      setRunStatus("Main dashboard URL is required before the live review can run.");
+      return;
+    }
+    if (runMode === "fixed" && !form.validationUrl.trim()) {
+      setRunStatus("Validation dashboard URL is required for fixed comparison mode.");
+      return;
+    }
+
+    setRunning(true);
+    setRunStatus(`Running ${dashboardModeLabel(runMode).toLowerCase()} through the local dashboard review backend.`);
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/run-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: runMode,
+          baseUrl: effectiveBaseUrl,
+          mainUrl: form.mainUrl.trim(),
+          validationUrl: form.validationUrl.trim(),
+          navigationUrl: form.navigationUrl.trim(),
+          timeFrom: form.timeFrom.trim() || "now-1h",
+          timeTo: form.timeTo.trim() || "now",
+          reviewTimestamp: form.reviewTimestamp.trim()
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Dashboard review failed with HTTP ${response.status}.`);
+      }
+      const savedFolder = payload.paths?.folder ? ` Fresh artifacts were saved under ${payload.paths.folder}.` : "";
+      setRunStatus(`Live dashboard review completed.${savedFolder}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setRunStatus(`Live review failed: ${message || "Start the dashboard reviewer with python review_server.py, then try again."}`);
+    } finally {
+      setRunning(false);
+    }
+  }
+
   return (
     <section className="dashboard-review-placeholder">
-      <div className="dashboard-review-empty-state">
-        <span className="eyebrow">Current Packet</span>
-        <h3>AI Dashboard Review and Validation</h3>
-        <p>{project.projectName || project.projectId}</p>
+      <div className="dashboard-review-blueprint">
+        <div className="dashboard-blueprint-head">
+          <div>
+            <span className="eyebrow">Current Packet</span>
+            <h3>AI Dashboard Review and Validation</h3>
+            <p>{project.projectName || project.projectId}</p>
+          </div>
+          <span className="dashboard-prototype-pill">Dashboard</span>
+        </div>
+
+        <div className="dashboard-mode-switch" role="tablist" aria-label="Dashboard review mode">
+          {(["linked", "fixed", "single"] as DashboardRunMode[]).map((mode) => (
+            <button
+              className={`dashboard-mode-option ${runMode === mode ? "active" : ""}`}
+              key={mode}
+              onClick={() => {
+                setRunMode(mode);
+                setRunStatus(`Mode changed to ${dashboardModeLabel(mode)}. Analyze setup before running live review.`);
+              }}
+              type="button"
+            >
+              {dashboardModeLabel(mode)}
+            </button>
+          ))}
+        </div>
+
+        <div className="dashboard-setup-grid">
+          <label className="dashboard-field">
+            <span>Grafana base URL</span>
+            <input
+              onChange={(event) => updateForm("baseUrl", event.target.value)}
+              placeholder="https://grafana.example.com or https://host/grafana"
+              type="url"
+              value={form.baseUrl}
+            />
+          </label>
+          <label className="dashboard-field">
+            <span>Review timestamp</span>
+            <div className="dashboard-inline-field">
+              <input
+                onChange={(event) => updateForm("reviewTimestamp", event.target.value)}
+                placeholder="DD-MM-YYYY HH:MM:SS"
+                type="text"
+                value={form.reviewTimestamp}
+              />
+              <button
+                className="secondary-btn dashboard-now-btn"
+                onClick={() => updateForm("reviewTimestamp", formatDateTime(new Date()))}
+                type="button"
+              >
+                <RefreshCw size={15} />
+                Now
+              </button>
+            </div>
+          </label>
+          <label className="dashboard-field dashboard-field-wide">
+            <span>Main dashboard URL</span>
+            <input
+              onChange={(event) => updateForm("mainUrl", event.target.value)}
+              placeholder="https://host/grafana/d/uid/slug?var-region=All"
+              type="url"
+              value={form.mainUrl}
+            />
+          </label>
+          {runMode === "fixed" && (
+            <label className="dashboard-field dashboard-field-wide">
+              <span>Validation dashboard URL</span>
+              <input
+                onChange={(event) => updateForm("validationUrl", event.target.value)}
+                placeholder="Required for fixed comparison mode"
+                type="url"
+                value={form.validationUrl}
+              />
+            </label>
+          )}
+          {runMode === "linked" && (
+            <label className="dashboard-field dashboard-field-wide">
+              <span>Navigation dashboard URL</span>
+              <input
+                onChange={(event) => updateForm("navigationUrl", event.target.value)}
+                placeholder="Optional route map for ambiguous or partial links"
+                type="url"
+                value={form.navigationUrl}
+              />
+            </label>
+          )}
+          <label className="dashboard-field">
+            <span>Time from</span>
+            <input onChange={(event) => updateForm("timeFrom", event.target.value)} type="text" value={form.timeFrom} />
+          </label>
+          <label className="dashboard-field">
+            <span>Time to</span>
+            <input onChange={(event) => updateForm("timeTo", event.target.value)} type="text" value={form.timeTo} />
+          </label>
+        </div>
+
+        <div className="dashboard-context-strip">
+          <div>
+            <span>Effective base</span>
+            <strong>{effectiveBaseUrl || "Waiting for Grafana URL"}</strong>
+          </div>
+          <div>
+            <span>Main dashboard UID</span>
+            <strong>{parsedMain?.uid || "Not parsed yet"}</strong>
+          </div>
+          <div>
+            <span>URL variables</span>
+            <strong>{parsedMain?.variableCount ?? 0}</strong>
+          </div>
+        </div>
+
+        <div className="dashboard-setup-actions">
+          <div className="dashboard-button-row">
+            <button className="primary-btn" onClick={analyzeDashboardSetup} type="button">
+              <FileText size={16} />
+              Analyze setup
+            </button>
+            <button className="secondary-btn" disabled={running} onClick={runDashboardReview} type="button">
+              {running ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
+              {running ? "Running review..." : "Run live review"}
+            </button>
+            <button className="secondary-btn" onClick={() => window.open("http://127.0.0.1:8000/index.html", "_blank", "noopener")} type="button">
+              <ArrowRight size={16} />
+              Open reviewer
+            </button>
+          </div>
+          <span className="dashboard-run-status">{runStatus}</span>
+        </div>
       </div>
     </section>
   );
+}
+
+function dashboardModeLabel(mode: DashboardRunMode) {
+  if (mode === "fixed") return "Fixed comparison";
+  if (mode === "single") return "Single dashboard";
+  return "Linked validation";
+}
+
+function dashboardRunReadiness(
+  mode: DashboardRunMode,
+  form: { baseUrl: string; mainUrl: string; validationUrl: string; timeFrom: string; timeTo: string },
+  effectiveBaseUrl: string
+) {
+  if (!form.mainUrl.trim()) return "Add the main dashboard URL to prepare the live review.";
+  if (mode === "fixed" && !form.validationUrl.trim()) return "Add the validation dashboard URL to run fixed comparison mode.";
+  const timeRange = `${form.timeFrom.trim() || "now-1h"} to ${form.timeTo.trim() || "now"}`;
+  return `Setup analyzed. Ready for ${dashboardModeLabel(mode).toLowerCase()} against ${effectiveBaseUrl || "the supplied Grafana host"} for ${timeRange}.`;
+}
+
+function parseDashboardSetupUrl(input: string, fallbackBase?: string) {
+  const raw = input.trim();
+  if (!raw) return null;
+  try {
+    const url = /^https?:\/\//i.test(raw) ? new URL(raw) : new URL(raw.replace(/^\//, ""), ensureTrailingSlash(fallbackBase || ""));
+    const segments = url.pathname.split("/").filter(Boolean);
+    const dIndex = segments.indexOf("d");
+    const uid = dIndex >= 0 ? segments[dIndex + 1] || "" : "";
+    const prefix = dIndex >= 0 ? segments.slice(0, dIndex).join("/") : "";
+    let variableCount = 0;
+    url.searchParams.forEach((_, key) => {
+      if (key.startsWith("var-")) variableCount += 1;
+    });
+    return {
+      uid,
+      baseUrl: normalizeBaseUrl(`${url.origin}${prefix ? `/${prefix}` : ""}`),
+      variableCount
+    };
+  } catch {
+    return null;
+  }
 }
 
 function PhaseGuide({ phase }: { phase: Phase }) {
@@ -1747,6 +1980,29 @@ function slugify(value: string) {
     .replace(/[^a-z0-9_-]+/g, "-")
     .replace(/^[-_]+|[-_]+$/g, "")
     .slice(0, 63);
+}
+
+function normalizeBaseUrl(value: string) {
+  const raw = value.trim();
+  if (!raw) return "";
+  try {
+    const url = /^https?:\/\//i.test(raw) ? new URL(raw) : new URL(`https://${raw}`);
+    const normalizedPath = url.pathname === "/" ? "" : url.pathname.replace(/\/+$/, "");
+    return `${url.origin}${normalizedPath}`;
+  } catch {
+    return raw.replace(/\/+$/, "");
+  }
+}
+
+function ensureTrailingSlash(value: string) {
+  return value.endsWith("/") ? value : `${value}/`;
+}
+
+function formatDateTime(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+    date.getSeconds()
+  )}`;
 }
 
 function formatBytes(value: number) {
