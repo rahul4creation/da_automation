@@ -1,0 +1,552 @@
+import { chromium } from "@playwright/test";
+import fs from "node:fs/promises";
+import path from "node:path";
+
+const ROOT = path.resolve("D:/AIReview/da_automation/DA AUTOMATION UI");
+const OUT_DIR = path.join(ROOT, "docs", "sop-da-report-review-ui");
+const SCREEN_DIR = path.join(OUT_DIR, "screenshots");
+const HTML_PATH = path.join(OUT_DIR, "SOP for DA Report Review UI.html");
+const PDF_PATH = path.join(OUT_DIR, "SOP for DA Report Review UI.pdf");
+const APP_URL = "http://127.0.0.3:5190/";
+const API_URL = "http://127.0.0.3:8802/";
+const CHROME_PATH = "C:/Program Files/Google/Chrome/Application/chrome.exe";
+
+await fs.mkdir(SCREEN_DIR, { recursive: true });
+
+async function chromeLaunchOptions() {
+  try {
+    await fs.access(CHROME_PATH);
+    return { headless: true, executablePath: CHROME_PATH };
+  } catch {
+    return { headless: true };
+  }
+}
+
+async function waitStable(page) {
+  await page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(800);
+}
+
+async function screenshot(page, name, selector = "body", options = {}) {
+  const target = page.locator(selector).first();
+  await target.waitFor({ state: "visible", timeout: 10000 });
+  const filePath = path.join(SCREEN_DIR, `${name}.png`);
+  await target.screenshot({ path: filePath, ...options });
+  return path.relative(OUT_DIR, filePath).replaceAll("\\", "/");
+}
+
+async function optionalScreenshot(page, name, selector, options = {}) {
+  try {
+    await page.locator(selector).first().scrollIntoViewIfNeeded({ timeout: 5000 });
+    await page.waitForTimeout(400);
+    return await screenshot(page, name, selector, options);
+  } catch (error) {
+    console.warn(`Skipping screenshot ${name}: ${error.message}`);
+    return "";
+  }
+}
+
+async function captureScreenshots() {
+  const images = {
+    loginShot: "",
+    dashboardShot: "",
+    phaseGuideShot: "",
+    agentInputsShot: "",
+    checklistEditorShot: "",
+    correctionShot: "",
+    repositoryShot: ""
+  };
+
+  let browser;
+  try {
+    browser = await chromium.launch(await chromeLaunchOptions());
+    const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
+    await page.goto(`${APP_URL}?sop=${Date.now()}`, { waitUntil: "domcontentloaded", timeout: 8000 });
+    await waitStable(page);
+
+    const loginInputs = page.locator("input");
+    if ((await loginInputs.count()) >= 1) {
+      await loginInputs.nth(0).fill("");
+    }
+    images.loginShot = await optionalScreenshot(page, "01-login-screen", ".login-card");
+    if ((await loginInputs.count()) >= 2) {
+      await loginInputs.nth(0).fill("Rahul_Raj");
+      await loginInputs.nth(1).fill("Alpha1");
+      await page.getByRole("button", { name: "Sign In" }).click();
+      await waitStable(page);
+    }
+
+    const projectRows = page.locator(".project-row");
+    const projectCount = await projectRows.count();
+    let selected = false;
+    for (let index = 0; index < projectCount; index += 1) {
+      const row = projectRows.nth(index);
+      const text = await row.innerText({ timeout: 3000 }).catch(() => "");
+      if (/UPCL REPORT|project_id/i.test(text)) {
+        await row.click();
+        selected = true;
+        break;
+      }
+    }
+    if (!selected && projectCount > 0) await projectRows.nth(0).click();
+    await waitStable(page);
+
+    images.dashboardShot = await optionalScreenshot(page, "02-ai-review-validation-dashboard", ".workflow-grid");
+    images.phaseGuideShot = await optionalScreenshot(page, "03-phase-guide", ".phase-guide-simple");
+    images.agentInputsShot = await optionalScreenshot(page, "04-agent-inputs", "#agent-inputs");
+    images.checklistEditorShot = await optionalScreenshot(page, "05-checklist-excel-editor", "#checklist-excel-editor");
+    images.correctionShot = await optionalScreenshot(page, "06-correction-observations", "#correction-observations");
+    images.repositoryShot = await optionalScreenshot(page, "07-review-file-repository", "#review-repository");
+  } catch (error) {
+    console.warn(`Live UI screenshots were not captured: ${error.message}`);
+  } finally {
+    if (browser) await browser.close();
+  }
+
+  return images;
+}
+
+function localGeneratedAt() {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Kolkata"
+  }).format(new Date()).replace(",", "");
+}
+
+function figure(src, caption) {
+  if (!src) return "";
+  return `<div class="figure"><img src="${src}" /><div class="caption">${caption}</div></div>`;
+}
+
+const images = await captureScreenshots();
+const generatedAt = localGeneratedAt();
+
+const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>SOP for DA Report Review UI</title>
+  <style>
+    @page { size: A4; margin: 13mm 11mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #152033;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.45;
+      background: #ffffff;
+    }
+    h1, h2, h3 { margin: 0; color: #0c4f67; letter-spacing: 0; }
+    h1 { font-size: 28px; }
+    h2 {
+      margin-top: 18px;
+      padding-bottom: 5px;
+      border-bottom: 2px solid #0f7898;
+      font-size: 18px;
+      page-break-after: avoid;
+    }
+    h3 { margin-top: 12px; font-size: 13px; }
+    p { margin: 6px 0; }
+    ul, ol { margin: 6px 0 8px 18px; padding: 0; }
+    li { margin: 3px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 10px; page-break-inside: avoid; }
+    th, td { border: 1px solid #cfd8e3; padding: 6px; vertical-align: top; }
+    th { background: #eef5f8; color: #163348; font-weight: 700; }
+    code {
+      padding: 1px 4px;
+      border: 1px solid #d6dee8;
+      border-radius: 4px;
+      background: #f7fafc;
+      color: #10233a;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 10px;
+    }
+    pre {
+      margin: 8px 0 10px;
+      padding: 9px 11px;
+      border: 1px solid #cfd8e3;
+      border-radius: 8px;
+      background: #f7fafc;
+      color: #10233a;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 10px;
+      white-space: pre-wrap;
+    }
+    .cover {
+      padding: 28px;
+      border: 1px solid #bdd5dd;
+      border-left: 8px solid #0f7898;
+      border-radius: 12px;
+      background: #f8fbfc;
+      margin-bottom: 16px;
+    }
+    .subtitle { margin-top: 8px; color: #536277; font-size: 14px; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .meta div, .note, .warning {
+      padding: 9px 11px;
+      border: 1px solid #cfd8e3;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+    .note { background: #f4fbf7; border-color: #b7dac5; }
+    .warning { background: #fff8ee; border-color: #ecc27a; }
+    .tag {
+      display: inline-block;
+      margin: 2px 4px 2px 0;
+      padding: 3px 7px;
+      border: 1px solid #bfd0dc;
+      border-radius: 999px;
+      background: #f7fafc;
+      color: #20364d;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .figure {
+      break-inside: auto;
+      page-break-inside: auto;
+      margin: 10px 0 14px;
+      padding: 8px;
+      border: 1px solid #d6dee8;
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+    .figure img {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      max-height: 180mm;
+      height: auto;
+      margin: 0 auto;
+      object-fit: contain;
+      border: 1px solid #d0d7e2;
+      border-radius: 6px;
+      background: #ffffff;
+    }
+    .caption { margin-top: 5px; color: #536277; font-size: 10px; font-weight: 700; }
+    .step {
+      page-break-inside: avoid;
+      margin: 8px 0;
+      padding: 9px 11px;
+      border: 1px solid #d4dde8;
+      border-left: 4px solid #0f7898;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+    .step strong { color: #10233a; }
+    .flowchart {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 10px 0;
+      page-break-inside: avoid;
+    }
+    .flow {
+      min-height: 58px;
+      padding: 8px;
+      border: 1px solid #c8d5df;
+      border-radius: 8px;
+      background: #f8fbfc;
+      text-align: center;
+      font-weight: 700;
+    }
+    .flow small { display: block; margin-top: 4px; color: #536277; font-weight: 400; }
+    .small { color: #536277; font-size: 10px; }
+    .checklist td:first-child { width: 32px; text-align: center; font-weight: 700; }
+    .footer-note { margin-top: 20px; color: #536277; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <h1>SOP for DA Report Review UI</h1>
+    <p class="subtitle">Step-by-step standard operating procedure for installing, running, and using the DA Automation duplicate UI for Excel report review.</p>
+    <div class="meta">
+      <div><strong>UI URL</strong><br/>${APP_URL}</div>
+      <div><strong>API URL</strong><br/>${API_URL}</div>
+      <div><strong>User Access</strong><br/>Use assigned UI credentials</div>
+      <div><strong>Prepared On</strong><br/>${generatedAt}</div>
+    </div>
+    <p>
+      <span class="tag">Excel-only validation</span>
+      <span class="tag">Checklist revision control</span>
+      <span class="tag">Data and design corrections</span>
+      <span class="tag">Latest PDF/TXT repository</span>
+      <span class="tag">Project/category/date output folders</span>
+    </p>
+  </section>
+
+  <h2>1. Purpose and Scope</h2>
+  <p>This SOP explains how to configure and run the DA Report Review UI on another Windows user system, how to validate selected Excel reports, and where to find the generated review files.</p>
+  <div class="note"><strong>Current validation mode:</strong> The duplicate UI uses Excel files for design validation and data validation. PDF input files are not required for the current UI review run.</div>
+  <div class="warning"><strong>Current UI visibility:</strong> Source Files, Review Stages, Quality Checks, Reconciliation Evidence, Artifacts, and Agent Output are hidden in the operator UI. The visible operator flow is Agent Inputs, Checklist Workbook Editor, Correction Observations From Review Files, and Review File Repository.</div>
+
+  <h2>2. Required Folder Layout on Another System</h2>
+  <p>Before running the UI on another user system, keep the same base folder structure under <code>D:\\AIReview</code>.</p>
+  <table>
+    <thead><tr><th>Folder</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>D:\\AIReview\\da_automation\\DA AUTOMATION UI</code></td><td>Duplicate UI application, server code, scripts, and SOP files.</td></tr>
+      <tr><td><code>D:\\AIReview\\report-review-agent</code></td><td>Review-agent code used by the UI to run Excel design/data validation.</td></tr>
+      <tr><td><code>D:\\AIReview\\report-review-input\\excel-pdf-data\\checklist</code></td><td>Default checklist workbook folder.</td></tr>
+      <tr><td><code>D:\\AIReview\\report-review-input\\excel-pdf-data\\excel-reports</code></td><td>Default Excel report folder.</td></tr>
+      <tr><td><code>D:\\AIReview\\project</code></td><td>Generated review file repository. The UI creates project/category/date folders here.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. Prerequisites on Another User System</h2>
+  <ol>
+    <li>Install Windows-compatible <strong>Node.js 20 or higher</strong>.</li>
+    <li>Install <strong>Python 3.10 or higher</strong> if checklist revision scripts or agent helper scripts require Python.</li>
+    <li>Install Google Chrome or allow Playwright Chromium to run for PDF/SOP generation and browser automation.</li>
+    <li>Copy the full <code>D:\\AIReview</code> project folder or restore the same folders listed in Section 2.</li>
+    <li>Confirm the user has read/write permission for <code>D:\\AIReview\\project</code> and the input folders.</li>
+  </ol>
+  <pre>node -v
+npm -v
+python --version</pre>
+
+  <h2>4. UI Configuration</h2>
+  <p>Open <code>D:\\AIReview\\da_automation\\DA AUTOMATION UI\\.env</code> and confirm the host/port settings.</p>
+  <pre>APP_HOST=127.0.0.3
+APP_PORT=5190
+APP_PREVIEW_PORT=4190
+
+API_HOST=127.0.0.3
+API_PORT=8802</pre>
+  <div class="warning"><strong>Port note:</strong> If another system cannot use <code>127.0.0.3</code>, change both APP_HOST and API_HOST to <code>127.0.0.1</code>. If port 5190 or 8802 is already in use, choose a free port and update the matching value in <code>.env</code>.</div>
+
+  <h2>5. Install and Run the UI</h2>
+  <p>Run these commands from Command Prompt. Use two terminal windows for the server and client.</p>
+  <table>
+    <thead><tr><th>Step</th><th>Command</th><th>Expected Result</th></tr></thead>
+    <tbody>
+      <tr><td>Open UI folder</td><td><code>cd /d "D:\\AIReview\\da_automation\\DA AUTOMATION UI"</code></td><td>Command prompt is inside the UI project folder.</td></tr>
+      <tr><td>Install packages</td><td><code>npm install</code></td><td><code>node_modules</code> is installed or refreshed.</td></tr>
+      <tr><td>Start API server</td><td><code>npm run dev:server</code></td><td>API starts on <code>${API_URL}</code>.</td></tr>
+      <tr><td>Start UI client</td><td><code>npm run dev:client</code></td><td>Vite UI starts on <code>${APP_URL}</code>.</td></tr>
+      <tr><td>Open browser</td><td><code>${APP_URL}</code></td><td>Login screen appears.</td></tr>
+    </tbody>
+  </table>
+  <p>Alternative single-command startup: run <code>npm run dev</code> from the UI folder. This starts server and client together.</p>
+
+  <h2>6. Login and Logout</h2>
+  ${figure(images.loginShot, "Screenshot 1: Login screen for Report & Dashboard Review.")}
+  <ol>
+    <li>Open <strong>${APP_URL}</strong>.</li>
+    <li>Enter the assigned username.</li>
+    <li>Enter the assigned password. Admin credentials are not printed in this SOP.</li>
+    <li>Click <strong>Sign In</strong>.</li>
+    <li>Use the username dropdown to log out. Logout returns to the login screen; the last username can remain as a hint/default, and the password stays empty.</li>
+    <li>Only the configured admin user can create users. Admin credentials must be shared separately through the approved internal channel.</li>
+  </ol>
+
+  <h2>7. Operator Flowchart</h2>
+  <div class="flowchart">
+    <div class="flow">Login<small>Assigned UI user</small></div>
+    <div class="flow">Select Project<small>AI Review and Validation opens</small></div>
+    <div class="flow">Review Phase Guide<small>Work to do and expected output</small></div>
+    <div class="flow">Select Inputs<small>Checklist and Excel reports</small></div>
+    <div class="flow">Edit Checklist<small>Optional new revision</small></div>
+    <div class="flow">Run Review<small>Fresh run from current files</small></div>
+    <div class="flow">Read Corrections<small>Data and design tables</small></div>
+    <div class="flow">Repository<small>Open/download latest PDF/TXT</small></div>
+  </div>
+
+  <h2>8. Select Project and Open AI Review</h2>
+  ${figure(images.dashboardShot, "Screenshot 2: AI Review and Validation dashboard for the selected project.")}
+  <ol>
+    <li>Select an existing project from the left project panel or create a new project.</li>
+    <li>The UI opens the <strong>AI Review and Validation</strong> phase by default for the report review workflow.</li>
+    <li>Use project rename and save controls when the project display name needs correction.</li>
+    <li>On page refresh, the UI does not show previous run output by default. It starts blank until the user runs a new review or refreshes the repository.</li>
+  </ol>
+
+  <h2>9. Phase Guide</h2>
+  ${figure(images.phaseGuideShot, "Screenshot 3: Phase Guide shown in the AI Review and Validation workflow.")}
+  <table>
+    <thead><tr><th>Phase Guide Row</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Work to do</td><td>Review generated Excel finding files, checklist status, correction evidence, and open issues.</td></tr>
+      <tr><td>Useful uploads</td><td>Generated review JSON, Markdown summaries, design matrix, data validation matrix, selected checklist, or Excel report.</td></tr>
+      <tr><td>Expected output</td><td>Review summary, matrix counts, correction observations, generated PDF/TXT files, and sign-off evidence.</td></tr>
+      <tr><td>Gate focus</td><td>High review findings must be fixed or formally accepted before testing/sign-off.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>10. Agent Inputs</h2>
+  ${figure(images.agentInputsShot, "Screenshot 4: Agent Inputs for project name, checklist, and Excel report selection.")}
+  <table>
+    <thead><tr><th>Input</th><th>User Action</th><th>Important Rule</th></tr></thead>
+    <tbody>
+      <tr><td>Project Name</td><td>Type the project name, for example <strong>UPCL REPORT</strong>.</td><td>This project name is written inside review files and used in the output folder path.</td></tr>
+      <tr><td>Checklist Selection</td><td>Select a checklist from the dropdown or use <strong>Browse</strong>.</td><td>No file is selected by default in browse mode. Select the intended checklist before running.</td></tr>
+      <tr><td>Excel Report Selection</td><td>Select one or multiple Excel files from dropdown/browse.</td><td>Select one file for a single report review or multiple files for same-family cross-report validation.</td></tr>
+      <tr><td>PDF Report Selection</td><td>No action required.</td><td>The current duplicate UI validates Excel files only. PDF report files are not required.</td></tr>
+      <tr><td>Run Review</td><td>Click after required selections are complete.</td><td>Each click starts a fresh review from the current selected files; old saved output is not used as validation input.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>11. Report Selection Rules</h2>
+  <ul>
+    <li>Select only related report families together. Analog reports should be validated with Analog reports.</li>
+    <li>SAIFI/SAIDI reports should be validated with SAIFI/SAIDI reports.</li>
+    <li>For SAIFI/SAIDI hierarchy validation, Feeder Wise is the base report. Child reports such as Circle, Division, Subdivision, Zone, and Feeder Category are checked by grouping Feeder Wise data to the matching hierarchy level.</li>
+    <li>Unrelated families such as Analog and SAIFI/SAIDI should not be cross-compared as direct report pairs.</li>
+    <li>If selected reports are mixed or not recognized as one family, the output is categorized under <strong>Misslaneous</strong>.</li>
+  </ul>
+
+  <h2>12. Checklist Workbook Editor</h2>
+  ${figure(images.checklistEditorShot, "Screenshot 5: Checklist Workbook Editor with browse, latest revision option, sheet selection, and save revision.")}
+  <ol>
+    <li>Use <strong>Checklist Selection</strong> in the editor to browse or select the checklist workbook to edit.</li>
+    <li>Enable <strong>Always select latest checklist revision</strong> when the newest revision should load automatically after page open, refresh, or save.</li>
+    <li>Select the required sheet in <strong>Checklist Sheet</strong>.</li>
+    <li>Click <strong>Refresh Sheet</strong> to reload workbook rows.</li>
+    <li>Click <strong>Add Row</strong> to add a new checklist point.</li>
+    <li>Edit the checklist point text in the grid.</li>
+    <li>Click <strong>Save Edited Revision</strong>. A new workbook revision is created and old files are kept.</li>
+  </ol>
+  <p>Revision sequence follows: <strong>Rev 0.0 to Rev 0.10, then Rev 1.0 to Rev 1.10</strong>, continuing in the same pattern.</p>
+
+  <h2>13. Run Review</h2>
+  <div class="step"><strong>Before clicking Run Review:</strong> Confirm the project name, checklist selection, and Excel report selection. The Run Review button remains disabled until the required selections are present.</div>
+  <ol>
+    <li>Click <strong>Run Review</strong>.</li>
+    <li>Wait for the agent to finish. Large Excel workbooks or many selected files can take longer.</li>
+    <li>After completion, a popup appears: <strong>Review files generated successfully</strong>.</li>
+    <li>Close the popup after confirming the generated files list.</li>
+    <li>Review the matrix cards, correction observations, and repository files.</li>
+  </ol>
+
+  <h2>14. Matrix Count Cards</h2>
+  <p>The cards above Agent Inputs summarize checklist-matrix status counts.</p>
+  <table>
+    <thead><tr><th>Card</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Design Check Matrix</td><td>OK, Not OK, and NA counts from design checklist validation.</td></tr>
+      <tr><td>Data Validation Check Matrix</td><td>OK, Not OK, and NA counts from data validation checklist rules.</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><strong>Count rule:</strong> Matrix counts are checklist rule counts. They are different from row-level mismatch counts because one checklist rule can produce many detailed row mismatches.</div>
+
+  <h2>15. Correction Observations From Review Files</h2>
+  ${figure(images.correctionShot, "Screenshot 6: Correction Observations From Review Files split into Data and Design sections.")}
+  <p>The Correction Observations block appears after the Checklist Workbook Editor. It is split into two parts:</p>
+  <table>
+    <thead><tr><th>Section</th><th>What It Shows</th><th>How To Use It</th></tr></thead>
+    <tbody>
+      <tr><td>Data Correction Observations</td><td>Not OK data-validation checklist points from the latest review files.</td><td>Fix source data, hierarchy aggregation, report values, or document approved exception evidence.</td></tr>
+      <tr><td>Design Correction Observations</td><td>Not OK design checklist points from the latest review files.</td><td>Fix report layout, naming, header, formatting, alignment, or document approved design evidence.</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Point</td><td>Sequential correction observation number shown in UI.</td></tr>
+      <tr><td>Checklist S.NO</td><td>Checklist serial number from the generated review matrix.</td></tr>
+      <tr><td>Report</td><td>Report where the checklist item is Not OK.</td></tr>
+      <tr><td>State</td><td>Observed status, normally Not OK for actionable rows.</td></tr>
+      <tr><td>Check Point</td><td>Checklist rule that failed.</td></tr>
+      <tr><td>Observation</td><td>Evidence extracted from generated review files.</td></tr>
+      <tr><td>Correction Required</td><td>Action required before approval/sign-off.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>16. Output File Location</h2>
+  <p>All generated review files are saved under the project repository root:</p>
+  <pre>D:\\AIReview\\project\\&lt;Project Name&gt;\\&lt;Report Category&gt;\\&lt;DD-MM-YYYY HH-MM-SS&gt;\\</pre>
+  <table>
+    <thead><tr><th>Report Category Folder</th><th>When It Is Used</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Analog Reports</strong></td><td>Selected Excel report headers indicate Analog reports only.</td><td><code>D:\\AIReview\\project\\UPCL REPORT\\Analog Reports\\20-07-2026 16-04-50\\</code></td></tr>
+      <tr><td><strong>Saifi Saidi Reports</strong></td><td>Selected Excel report headers indicate SAIFI/SAIDI reports only.</td><td><code>D:\\AIReview\\project\\UPCL REPORT\\Saifi Saidi Reports\\20-07-2026 16-04-50\\</code></td></tr>
+      <tr><td><strong>Misslaneous</strong></td><td>Selected files are mixed, unknown, or not one recognized family.</td><td><code>D:\\AIReview\\project\\UPCL REPORT\\Misslaneous\\20-07-2026 16-04-50\\</code></td></tr>
+    </tbody>
+  </table>
+  <div class="warning"><strong>Windows folder-name rule:</strong> The UI displays date/time as <strong>dd-mm-yyyy hh:mm:ss</strong>, but the actual timestamp folder uses hyphens in the time, for example <strong>20-07-2026 16-04-50</strong>, because Windows folder names cannot contain colons.</div>
+  <p>Existing generated files are kept. A new run creates a new timestamp folder; no previous review files are deleted by the UI workflow.</p>
+
+  <h2>17. Generated Review Files</h2>
+  <p>A successful run can generate the following artifacts inside the timestamp folder:</p>
+  <ul>
+    <li><code>*-design-review.pdf</code> - design review PDF.</li>
+    <li><code>*-excel-data-validation.pdf</code> - Excel data validation PDF.</li>
+    <li><code>*.txt</code> - text summary for quick review.</li>
+    <li><code>*.md</code> - Markdown review summaries.</li>
+    <li><code>*.json</code> - structured review result.</li>
+    <li><code>*-design-check-matrix.xlsx</code> - design matrix workbook.</li>
+    <li><code>*-data-validation-check-matrix.xlsx</code> - data validation matrix workbook.</li>
+    <li><code>*-ui-run-summary-*.json</code> - UI run summary metadata.</li>
+  </ul>
+  <p>The review files include the UI project name and the logged-in reviewer name.</p>
+
+  <h2>18. Review File Repository</h2>
+  ${figure(images.repositoryShot, "Screenshot 7: Review File Repository showing the latest generated operator files.")}
+  <ol>
+    <li>The folder row shows <code>D:\\AIReview\\project\\&lt;Project Name&gt;</code>.</li>
+    <li>Click <strong>Refresh</strong> to reload files after a run.</li>
+    <li>The repository shows the latest generated operator files, normally the latest review PDFs and TXT summary.</li>
+    <li>Use the eye icon to open supported files. PDF opens in a browser tab, and TXT/Markdown can be previewed in the UI.</li>
+    <li>Use the download icon to download a file.</li>
+  </ol>
+
+  <h2>19. How to Validate the Output</h2>
+  <table class="checklist">
+    <thead><tr><th>#</th><th>User Check</th><th>Expected Result</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Confirm login user.</td><td>Reviewer name in output matches the logged-in UI user.</td></tr>
+      <tr><td>2</td><td>Confirm project name.</td><td>Output path is under <code>D:\\AIReview\\project\\&lt;Project Name&gt;</code>.</td></tr>
+      <tr><td>3</td><td>Confirm selected checklist and Excel reports.</td><td>Selected files match the reports intended for review.</td></tr>
+      <tr><td>4</td><td>Check report-family category folder.</td><td>Analog, SAIFI/SAIDI, or Misslaneous folder is created correctly based on report header names.</td></tr>
+      <tr><td>5</td><td>Open Correction Observations.</td><td>Data and Design observations are listed separately with actionable correction text.</td></tr>
+      <tr><td>6</td><td>Open generated PDF/TXT files from repository.</td><td>PDF/TXT files match the latest timestamp folder and contain the same matrix/correction details.</td></tr>
+      <tr><td>7</td><td>Refresh browser.</td><td>Previous output is not loaded into the UI by default. Repository can be refreshed when files need to be viewed again.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>20. Troubleshooting</h2>
+  <table>
+    <thead><tr><th>Issue</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>UI does not open</td><td>Confirm <code>npm run dev:client</code> is running and open <code>${APP_URL}</code>.</td></tr>
+      <tr><td>API requests fail</td><td>Confirm <code>npm run dev:server</code> is running on <code>${API_URL}</code>.</td></tr>
+      <tr><td>Port already used</td><td>Stop the old process or change APP_PORT/API_PORT in <code>.env</code>.</td></tr>
+      <tr><td>Run Review disabled</td><td>Enter project name and select checklist plus Excel report files.</td></tr>
+      <tr><td>Checklist editor empty</td><td>Select a checklist workbook, choose a sheet, then click <strong>Refresh Sheet</strong>.</td></tr>
+      <tr><td>Generated files not visible</td><td>Click Repository Refresh and verify the timestamp folder under <code>D:\\AIReview\\project\\&lt;Project Name&gt;</code>.</td></tr>
+      <tr><td>Counts appear different</td><td>Matrix cards count checklist OK/Not OK/NA rows. Correction Observations count actionable checklist correction rows. Row-level mismatch totals can be higher because one rule can produce many mismatched rows.</td></tr>
+      <tr><td>SAIFI/SAIDI result looks mismatched by direct report pair</td><td>Confirm Feeder Wise is selected as the base report. Child reports must be validated by grouping Feeder Wise data to Circle, Division, Subdivision, Zone, or Feeder Category level.</td></tr>
+    </tbody>
+  </table>
+
+  <p class="footer-note">Prepared for the local DA Automation duplicate UI. This SOP describes the current UI behavior at ${APP_URL} as of ${generatedAt}.</p>
+</body>
+</html>`;
+
+await fs.writeFile(HTML_PATH, html, "utf8");
+
+const pdfBrowser = await chromium.launch(await chromeLaunchOptions());
+const pdfPage = await pdfBrowser.newPage({ viewport: { width: 1240, height: 1754 } });
+await pdfPage.goto(`file://${HTML_PATH.replaceAll("\\", "/")}`, { waitUntil: "networkidle" });
+await pdfPage.pdf({
+  path: PDF_PATH,
+  format: "A4",
+  printBackground: true,
+  margin: { top: "12mm", bottom: "12mm", left: "10mm", right: "10mm" }
+});
+await pdfBrowser.close();
+
+const stat = await fs.stat(PDF_PATH);
+const screenshotCount = Object.values(images).filter(Boolean).length;
+console.log(JSON.stringify({ htmlPath: HTML_PATH, pdfPath: PDF_PATH, bytes: stat.size, screenshots: screenshotCount }, null, 2));
