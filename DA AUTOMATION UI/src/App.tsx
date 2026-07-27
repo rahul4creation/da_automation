@@ -1473,7 +1473,8 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
     setRunning(true);
     setRunStatus(`Running ${dashboardModeLabel(runMode).toLowerCase()} through the local dashboard review backend.`);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/run-review", {
+      const reviewApiBase = `${window.location.protocol}//${window.location.hostname}:8000`;
+      const response = await fetch(`${reviewApiBase}/api/run-review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1624,7 +1625,7 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
               {running ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
               {running ? "Running review..." : "Run live review"}
             </button>
-            <button className="secondary-btn" onClick={() => window.open("http://127.0.0.1:8000/index.html", "_blank", "noopener")} type="button">
+            <button className="secondary-btn" onClick={() => window.open(`${window.location.protocol}//${window.location.hostname}:8000/index.html`, "_blank", "noopener")} type="button">
               <ArrowRight size={16} />
               Open reviewer
             </button>
