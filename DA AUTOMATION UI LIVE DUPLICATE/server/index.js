@@ -3627,6 +3627,8 @@ function readExcelWorkbookProfile(file) {
       blankCount += Math.max(0, maxColumn - row.filter((cell) => cleanCellText(cell)).length);
     }
     const metricValues = extractMetricValuesFromSheet(rows, sheetName);
+    const summaryValues = extractSummaryValuesFromSheet(rows, sheetName);
+    const columnBounds = populatedColumnBounds(rows);
     const labels = new Map();
     for (const metric of metricValues) {
       labels.set(metric.key, (labels.get(metric.key) || 0) + 1);
@@ -3638,10 +3640,12 @@ function readExcelWorkbookProfile(file) {
       columnCount: maxColumn,
       textValues,
       metricValues,
+      summaryValues,
       errorCount,
       blankCount,
       populatedCount,
-      duplicateLabelCount
+      duplicateLabelCount,
+      ...columnBounds
     };
   });
   const allText = sheetProfiles.flatMap((sheet) => sheet.textValues);
@@ -3661,6 +3665,7 @@ function readExcelWorkbookProfile(file) {
     populatedCount: sheetProfiles.reduce((sum, sheet) => sum + sheet.populatedCount, 0),
     duplicateLabelCount: sheetProfiles.reduce((sum, sheet) => sum + sheet.duplicateLabelCount, 0),
     dateTokens: [...new Set(allText.flatMap((text) => Array.from(String(text).matchAll(/\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b/g), (match) => match[0])))],
+    summaryValues: sheetProfiles.flatMap((sheet) => sheet.summaryValues || []),
     sheetProfiles
   };
 }
@@ -3782,6 +3787,29 @@ function reviewReportFamilyFromText(value) {
 function sheetRows(sheet) {
   if (!sheet) return [];
   return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false, blankrows: false });
+}
+
+function populatedColumnBounds(rows = []) {
+  let first = Infinity;
+  let last = -1;
+  let maxColumn = 0;
+  for (const row of rows) {
+    maxColumn = Math.max(maxColumn, row.length);
+    row.forEach((cell, index) => {
+      if (!cleanCellText(cell)) return;
+      first = Math.min(first, index);
+      last = Math.max(last, index);
+    });
+  }
+  if (!Number.isFinite(first)) {
+    return { firstPopulatedColumn: -1, lastPopulatedColumn: -1, leadingBlankColumns: 0, trailingBlankColumns: 0 };
+  }
+  return {
+    firstPopulatedColumn: first,
+    lastPopulatedColumn: last,
+    leadingBlankColumns: first,
+    trailingBlankColumns: Math.max(0, maxColumn - last - 1)
+  };
 }
 
 function inferExcelHierarchyScope(fileName) {
@@ -4293,6 +4321,7 @@ function extractMetricValuesFromSheet(rows, sheetName) {
       if (columnIndex === labelColumnIndex) continue;
       const header = cleanCellText(headers[columnIndex]);
       if (!header) continue;
+      if (isNonComparableExcelMetricHeader(header)) continue;
       const value = cleanCellText(row[columnIndex]);
       if (!value) continue;
       const normalizedHeader = normalizeExcelMetricHeader(header);
@@ -4310,6 +4339,60 @@ function extractMetricValuesFromSheet(rows, sheetName) {
   }
 
   return metricValues.length ? metricValues : extractFallbackMetricValuesFromSheet(rows, sheetName);
+}
+
+function extractSummaryValuesFromSheet(rows, sheetName) {
+  const headerIndex = findTabularHeaderRow(rows);
+  const summaryRows = rows.slice(0, headerIndex >= 0 ? headerIndex : Math.min(rows.length, 16));
+  const summaryValues = [];
+  for (const row of summaryRows) {
+    const cells = row.map((cell) => cleanCellText(cell));
+    for (const cell of cells) {
+      const match = cell.match(/^(.{2,80}?)\s*:\s*(.{1,120})$/);
+      if (!match) continue;
+      const label = cleanCellText(match[1]);
+      const value = cleanCellText(match[2]);
+      if (!isComparableSummaryLabel(label) || !isComparableSummaryValue(value)) continue;
+      summaryValues.push({
+        key: normalizeMetricKey(`summary ${label}`),
+        sheetName,
+        label,
+        value,
+        source: "summary_abstract"
+      });
+    }
+    for (let index = 0; index < cells.length - 1; index += 1) {
+      const label = cells[index];
+      const value = cells[index + 1];
+      if (!isComparableSummaryLabel(label) || !isComparableSummaryValue(value)) continue;
+      summaryValues.push({
+        key: normalizeMetricKey(`summary ${label}`),
+        sheetName,
+        label,
+        value,
+        source: "summary_abstract"
+      });
+    }
+  }
+  const unique = new Map();
+  for (const value of summaryValues) {
+    const key = `${value.key}\u0000${value.value}`;
+    if (!unique.has(key)) unique.set(key, value);
+  }
+  return [...unique.values()];
+}
+
+function isComparableSummaryLabel(label) {
+  const text = cleanCellText(label);
+  if (!text || text.length > 80) return false;
+  if (isNonComparableExcelMetricHeader(text)) return false;
+  return /\b(report\s+date|date|from|to|duration|period|total|count|records?|feeders?|average|avg|saifi|saidi|planned|unplanned|availability|abstract|summary|percentage|percent|%)\b/i.test(text);
+}
+
+function isComparableSummaryValue(value) {
+  const text = cleanCellText(value);
+  if (!text || text === "-") return false;
+  return isExcelNumericText(text) || /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b/.test(text) || /^\d{1,5}:\d{2}(?::\d{2})?$/.test(text);
 }
 
 function findTabularHeaderRow(rows) {
@@ -4347,6 +4430,7 @@ function extractFallbackMetricValuesFromSheet(rows, sheetName) {
       if (value === "" && !Number.isNaN(Number(text.replace(/,/g, "")))) value = text;
     }
     if (label && value !== "") {
+      if (isNonComparableExcelMetricHeader(label)) continue;
       metricValues.push({
         key: normalizeMetricKey(`${sheetName} ${label}`),
         sheetName,
@@ -4356,6 +4440,12 @@ function extractFallbackMetricValuesFromSheet(rows, sheetName) {
     }
   }
   return metricValues;
+}
+
+function isNonComparableExcelMetricHeader(header) {
+  const text = cleanCellText(header).replace(/\s+/g, " ");
+  return /^(s\.?\s*no\.?|sr\.?\s*no\.?|serial(?:\s+no\.?)?|index|#|no\.?|id|code|name|date|time|date\s*time)$/i.test(text)
+    || /\b(?:name|code|id)\b$/i.test(text);
 }
 
 function normalizeExcelMetricHeader(header) {
@@ -4511,17 +4601,16 @@ function excelOnlyComparisonValue(valueWithName) {
 function compareExcelProfilesWithinGroup(groupName, profiles) {
   const byMetric = new Map();
   for (const profile of profiles) {
-    for (const sheet of profile.sheetProfiles) {
-      for (const metric of sheet.metricValues) {
-        if (!byMetric.has(metric.key)) byMetric.set(metric.key, []);
-        byMetric.get(metric.key).push({
-          groupName,
-          fileName: profile.file.name,
-          sheetName: metric.sheetName,
-          label: metric.label,
-          value: metric.value
-        });
-      }
+    for (const metric of excelComparableValuesForProfile(profile)) {
+      if (!byMetric.has(metric.key)) byMetric.set(metric.key, []);
+      byMetric.get(metric.key).push({
+        groupName,
+        fileName: profile.file.name,
+        sheetName: metric.sheetName,
+        label: metric.label,
+        value: metric.value,
+        source: metric.source || "row_level"
+      });
     }
   }
 
@@ -4533,12 +4622,14 @@ function compareExcelProfilesWithinGroup(groupName, profiles) {
     const first = uniqueFiles[0];
     for (const other of uniqueFiles.slice(1)) {
       const state = equivalentExcelValue(first.value, other.value) ? "match" : "mismatch";
+      const isSummary = first.source === "summary_abstract";
       const row = {
-        metric: `${groupName} | ${first.sheetName}: ${first.label}`,
+        metric: isSummary ? `${groupName} | Summary/Abstract: ${first.label}` : `${groupName} | ${first.sheetName}: ${first.label}`,
         excel: `${first.fileName}: ${first.value}`,
         pdf: `${other.fileName}: ${other.value}`,
         status: state,
         validation_group: groupName,
+        source: first.source || "row_level",
         left_report: first.fileName,
         right_report: other.fileName,
         left_value: first.value,
@@ -4553,6 +4644,15 @@ function compareExcelProfilesWithinGroup(groupName, profiles) {
     if (mismatchRows.length >= 200) break;
   }
   return { matchRows, mismatchRows };
+}
+
+function excelComparableValuesForProfile(profile = {}) {
+  const rows = [];
+  for (const sheet of profile.sheetProfiles || []) {
+    rows.push(...(sheet.metricValues || []).map((metric) => ({ ...metric, source: metric.source || "row_level" })));
+    rows.push(...(sheet.summaryValues || []).map((metric) => ({ ...metric, source: "summary_abstract" })));
+  }
+  return rows;
 }
 
 function crossExcelMismatchValueDetail(comparison, profile = null, limit = 6) {
@@ -4893,10 +4993,10 @@ function uniqueRegexMatches(text, pattern) {
 function dateTimeFormatTokens(profile) {
   const text = excelProfileVisibleText(profile);
   return {
-    dateOnly: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b(?!\s+\d{1,2}:\d{2})/g),
-    minute: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s+\d{1,2}:\d{2}\b(?!:\d{2})/g),
-    second: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s+\d{1,2}:\d{2}:\d{2}\b(?!\.\d)/g),
-    millisecond: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s+\d{1,2}:\d{2}:\d{2}\.\d{1,3}\b/g),
+    dateOnly: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b(?!\s*\d{1,2}:\d{2})/g),
+    minute: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s*\d{1,2}:\d{2}\b(?!:\d{2})/g),
+    second: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s*\d{1,2}:\d{2}:\d{2}\b(?!\.\d)/g),
+    millisecond: uniqueRegexMatches(text, /\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\s*\d{1,2}:\d{2}:\d{2}\.\d{1,3}\b/g),
     month: uniqueRegexMatches(text, /\b[A-Z]{3}[-/]\d{4}\b/gi)
   };
 }
@@ -4909,6 +5009,136 @@ function detectedDateTimeFormatSummary(tokens) {
   if (tokens.millisecond.length) detected.push(`DD-MM-YYYY HH:MM:SS.sss (${tokens.millisecond.slice(0, 2).join(", ")})`);
   if (tokens.month.length) detected.push(`MMM-YYYY (${tokens.month.slice(0, 2).join(", ")})`);
   return detected.length ? `Detected format(s): ${detected.join("; ")}.` : "No date or date-time token was detected in workbook text.";
+}
+
+function isExcelNumericText(value) {
+  return parseExcelNumericValue(value) !== null;
+}
+
+function parseExcelNumericValue(value) {
+  const text = cleanCellText(value).replace(/,/g, "").replace(/%$/, "");
+  if (!text || text === "-") return null;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
+
+function excelDecimalDigitCount(value) {
+  const text = cleanCellText(value).replace(/,/g, "");
+  const match = text.match(/^-?\d+\.(\d+)%?$/);
+  return match ? match[1].length : 0;
+}
+
+function excelNumericMetricValues(profile = {}) {
+  return excelComparableValuesForProfile(profile)
+    .filter((metric) => metric.source !== "summary_abstract")
+    .filter((metric) => parseExcelNumericValue(metric.value) !== null)
+    .filter((metric) => !isNonComparableExcelMetricHeader(metric.sourceColumnHeader || metric.columnHeader || metric.label));
+}
+
+function excelDecimalPrecisionStatus(profile = {}) {
+  const metrics = excelNumericMetricValues(profile);
+  if (!metrics.length) return matrixStatus("NA", "No comparable float/real numeric data column was detected after excluding S.No, serial, name, code, date, and time fields.");
+  const violations = metrics.filter((metric) => excelDecimalDigitCount(metric.value) > 2);
+  if (!violations.length) {
+    return matrixStatus("OK", `${metrics.length} numeric data value(s) were checked after excluding S.No/serial fields; no value used more than two decimal digits.`);
+  }
+  return matrixStatus(
+    "NOT OK",
+    `${violations.length} numeric data value(s) use more than two decimal digits after excluding S.No/serial fields. Examples: ${violations.slice(0, 6).map((metric) => `${metric.label}=${metric.value}`).join("; ")}.`
+  );
+}
+
+function excelPercentRangeStatus(profile = {}) {
+  const percentMetrics = excelComparableValuesForProfile(profile)
+    .filter((metric) => /%|percent|percentage/i.test(`${metric.sourceColumnHeader || ""} ${metric.columnHeader || ""} ${metric.label || ""}`))
+    .filter((metric) => parseExcelNumericValue(metric.value) !== null);
+  if (!percentMetrics.length) return matrixStatus("NA", "No percentage column was detected in this Excel report.");
+  const violations = percentMetrics.filter((metric) => {
+    const number = parseExcelNumericValue(metric.value);
+    return number < 0 || number > 100;
+  });
+  if (!violations.length) return matrixStatus("OK", `${percentMetrics.length} percentage value(s) were checked and all are between 0 and 100.`);
+  return matrixStatus(
+    "NOT OK",
+    `${violations.length} percentage value(s) are outside 0 to 100. Examples: ${violations.slice(0, 6).map((metric) => `${metric.label}=${metric.value}`).join("; ")}.`
+  );
+}
+
+function excelSummaryAbstractStatus(profile = {}, comparison = null, selectedExcelCount = 1) {
+  const summaryValues = profile.summaryValues || [];
+  if (!summaryValues.length) return matrixStatus("NA", "No comparable summary/abstract value was detected in the header/summary area of this Excel report.");
+  if (selectedExcelCount < 2 || !comparison) {
+    return matrixStatus("OK", `${summaryValues.length} summary/abstract value(s) were detected for single-report validation.`);
+  }
+  const counts = summaryAbstractComparisonCounts(comparison, profile);
+  if (counts.mismatch) {
+    return matrixStatus("NOT OK", `${counts.mismatch} summary/abstract mismatch(es) found. ${crossExcelMismatchValueDetail({ mismatchRows: counts.mismatchRows }, profile)}`);
+  }
+  if (counts.match) return matrixStatus("OK", `${counts.match} summary/abstract value comparison(s) matched across selected Excel reports.`);
+  return matrixStatus("NA", "Summary/abstract values were detected, but no common summary/abstract label was available across the selected comparable reports.");
+}
+
+function summaryAbstractComparisonCounts(comparison = {}, profile = null) {
+  const profileNames = new Set([profile?.file?.name, profile?.reportName].map((value) => cleanCellText(value)).filter(Boolean));
+  const inProfile = (row) => !profileNames.size || [row.left_report, row.right_report, row.excel, row.pdf].some((value) => [...profileNames].some((name) => String(value || "").includes(name)));
+  const isSummary = (row) => row?.source === "summary_abstract" || /\bsummary\/abstract\b/i.test(String(row?.metric || ""));
+  const matchRows = (comparison.matchRows || []).filter((row) => isSummary(row) && inProfile(row));
+  const mismatchRows = (comparison.mismatchRows || []).filter((row) => isSummary(row) && inProfile(row));
+  return { match: matchRows.length, mismatch: mismatchRows.length, matchRows, mismatchRows };
+}
+
+function rowLevelComparisonCounts(comparison = {}, profile = null) {
+  const profileNames = new Set([profile?.file?.name, profile?.reportName].map((value) => cleanCellText(value)).filter(Boolean));
+  const inProfile = (row) => !profileNames.size || [row.left_report, row.right_report, row.excel, row.pdf].some((value) => [...profileNames].some((name) => String(value || "").includes(name)));
+  const isRowLevel = (row) => row?.source !== "summary_abstract";
+  const matchRows = (comparison.matchRows || []).filter((row) => isRowLevel(row) && inProfile(row));
+  const mismatchRows = (comparison.mismatchRows || []).filter((row) => isRowLevel(row) && inProfile(row));
+  return { match: matchRows.length, mismatch: mismatchRows.length, matchRows, mismatchRows };
+}
+
+function excelHeaderSummaryLines(profile = {}) {
+  return (profile.sheetProfiles || [])
+    .flatMap((sheet) => (sheet.textValues || []).slice(0, 60))
+    .filter((value) => /^(name\s+of|from\s*:|to\s*:|date\s*:|report\s+date|duration|period|total\s+\w+\s*:|state\s*:|discom\s*:|zone\s*:|circle\s*:|division\s*:|subdivision\s*:|substation\s*:|feeder\s+category\s*:)/i.test(cleanCellText(value)));
+}
+
+function excelReportNameLengthStatus(profile = {}) {
+  const name = cleanCellText(profile.reportName || profile.file?.name);
+  if (!name) return matrixStatus("NA", "No report name was detected for individual report-name length review.");
+  return matrixStatus(
+    "OK",
+    `Individual report name detected with ${name.length} character(s). Different report-name lengths across comparison reports are not treated as a design mismatch.`
+  );
+}
+
+function excelReportNamingConventionStatus(profile = {}) {
+  const name = cleanCellText(profile.reportName || profile.file?.name);
+  if (!name) return matrixStatus("NA", "No report name was detected for naming-convention validation.");
+  const letters = name.replace(/[^A-Za-z]/g, "");
+  if (!letters) return matrixStatus("NA", `Report name "${name}" does not contain alphabetic characters to validate case convention.`);
+  const isUpper = letters === letters.toUpperCase();
+  return isUpper
+    ? matrixStatus("OK", `Report name "${name}" follows the required UPPER CASE convention.`)
+    : matrixStatus("NOT OK", `Report name "${name}" is not fully UPPER CASE. Report names should be UPPER CASE only.`);
+}
+
+function excelPageSetupWhitespaceStatus(profile = {}) {
+  const badSheets = (profile.sheetProfiles || []).filter((sheet) => Number(sheet.leadingBlankColumns || 0) > 2 || Number(sheet.trailingBlankColumns || 0) > 5);
+  if (!profile.usedSheetCount) return matrixStatus("NOT OK", "No populated sheet was available for page setup whitespace review.");
+  if (!badSheets.length) {
+    return matrixStatus("OK", "No large leading/trailing blank column space was detected around the populated Excel report area. Page size itself can vary by report length.");
+  }
+  return matrixStatus(
+    "NOT OK",
+    `Large blank column space was detected around populated report data. Examples: ${badSheets.slice(0, 4).map((sheet) => `${sheet.sheetName}: leading=${sheet.leadingBlankColumns}, trailing=${sheet.trailingBlankColumns}`).join("; ")}.`
+  );
+}
+
+function excelBlankPageStatus(profile = {}) {
+  const blankSheetCount = Math.max(0, Number(profile.sheetCount || 0) - Number(profile.usedSheetCount || 0));
+  return blankSheetCount
+    ? matrixStatus("NOT OK", `${blankSheetCount} blank worksheet(s) were found in the workbook.`)
+    : matrixStatus("OK", "No blank worksheet was found. Static Excel validation does not infer additional printed blank pages.");
 }
 
 function evaluateExcelDesignDateTimePoint(pointText, profile) {
@@ -4925,7 +5155,9 @@ function evaluateExcelDesignDateTimePoint(pointText, profile) {
   if (text.includes("date time with second") || (text.includes("hh:mm:ss") && !text.includes("sss"))) {
     return tokens.second.length
       ? matrixStatus("OK", `Detected DD-MM-YYYY HH:MM:SS date-time token(s): ${tokens.second.slice(0, 3).join(", ")}.`)
-      : matrixStatus("NA", `DD-MM-YYYY HH:MM:SS was not detected in this Excel report. ${summary}`);
+      : (tokens.minute.length || tokens.dateOnly.length || tokens.month.length)
+        ? matrixStatus("NOT OK", `Expected DD-MM-YYYY HH:MM:SS date-time format with seconds, but it was not detected. ${summary}`)
+        : matrixStatus("NA", `DD-MM-YYYY HH:MM:SS was not detected because no comparable date-time token was visible in this Excel report. ${summary}`);
   }
 
   if (text.includes("date time format") || text.includes("hh:mm")) {
@@ -4948,6 +5180,38 @@ function evaluateExcelDesignDateTimePoint(pointText, profile) {
 function evaluateExcelDesignPoint(pointText, profile) {
   const text = pointText.toLowerCase();
   if (!profile.usedSheetCount || !profile.populatedCount) return matrixStatus("NOT OK", "Workbook has no readable populated report sheet.");
+  if (/\breport\s+name\s+length\b/.test(text)) {
+    return excelReportNameLengthStatus(profile);
+  }
+  if (/\breport\s+names?\b.*\b(?:naming\s+convention|upper\s*case|pascalcase|camelcase)\b/.test(text) || /\bnaming\s+convention\b/.test(text)) {
+    return excelReportNamingConventionStatus(profile);
+  }
+  if (/\bblank\s+pages?\b/.test(text)) {
+    return excelBlankPageStatus(profile);
+  }
+  if (/\bpage\s+(?:number|details?)\b|\bpage\s+\d+\s+of\s+n\b|\bright\s+bottom\b/.test(text)) {
+    return matrixStatus("NA", "Printed page-number footer details are not reliably available from static Excel workbook data; Excel pagination can vary by print/export settings.");
+  }
+  if (/\bpage\s+setup\b|\bA4\b|\bA3\b|\bA2\b|\bA1\b/i.test(pointText)) {
+    return excelPageSetupWhitespaceStatus(profile);
+  }
+  if (/\bcharts?\b|\bgraphs?\b/.test(text)) {
+    return matrixStatus("NA", "No chart/graph object is validated from workbook cell data. This checkpoint is applicable only when a visible chart/graph is present and can be inspected visually.");
+  }
+  if (/\bs\.?\s*no\.?\b.*\bleft\s+align/.test(text)) {
+    return matrixStatus("NA", "S.No column presence can be detected, but left alignment is a visual/style check and is not failed from workbook data-only extraction.");
+  }
+  if (/\bborder\b/.test(text)) {
+    return matrixStatus("NA", "Column/header border separation is a visual/style check; workbook data-only extraction does not prove border alignment.");
+  }
+  if (/\breport\s+header\s+summary\b/.test(text)) {
+    const summaryLines = excelHeaderSummaryLines(profile);
+    if (!summaryLines.length) return matrixStatus("NOT OK", "Report header summary was not detected in the top workbook rows.");
+    if (/\bbold\b|\bleft\s+align/.test(text)) {
+      return matrixStatus("NA", `Report header summary text was detected (${summaryLines.slice(0, 4).join("; ")}), but bold/left alignment requires style or visual inspection.`);
+    }
+    return matrixStatus("OK", `Report header summary text was detected: ${summaryLines.slice(0, 4).join("; ")}.`);
+  }
   if (/\bdate\b|\bmonth\b|dd-mm-yyyy|hh:mm|mmm-yyyy/i.test(pointText)) {
     return evaluateExcelDesignDateTimePoint(pointText, profile);
   }
@@ -5008,6 +5272,15 @@ function evaluateExcelDataPoint(pointText, profile, comparison, selectedExcelCou
         : "No common SAIFI/SAIDI row labels and metric columns were found. Select matching report levels, or select a lower-level report with its parent rollup report."
     );
   }
+  if (/%|percent|percentage/.test(text)) {
+    return excelPercentRangeStatus(profile);
+  }
+  if (/\bfloat\b|\breal\b|\btwo\s+decimal\b|\bdecimal\s+part\b/.test(text)) {
+    return excelDecimalPrecisionStatus(profile);
+  }
+  if (/\b(summary|abstract)\b/.test(text)) {
+    return excelSummaryAbstractStatus(profile, comparison, selectedExcelCount);
+  }
   if (/\b(error|formula)\b/.test(text)) {
     return profile.errorCount ? matrixStatus("NOT OK", `${profile.errorCount} formula/error value(s) found.`) : matrixStatus("OK", "No formula error values found.");
   }
@@ -5029,9 +5302,16 @@ function evaluateExcelDataPoint(pointText, profile, comparison, selectedExcelCou
     if (!comparison.mismatchRows.length && !comparison.matchRows.length) {
       return matrixStatus("NA", "No common comparable metrics were found within the selected report family groups.");
     }
-    return comparison.mismatchRows.length
-      ? matrixStatus("NOT OK", `${comparison.mismatchRows.length} row-level mismatch(es) found across selected Excel reports. ${crossExcelMismatchValueDetail(comparison, profile)}`)
-      : matrixStatus("OK", `${comparison.matchRows.length} comparable row value(s) matched across selected Excel reports.`);
+    const rowLevelCounts = rowLevelComparisonCounts(comparison, profile);
+    if (!rowLevelCounts.mismatch && !rowLevelCounts.match) {
+      return matrixStatus("NA", "No common row-level data metrics were found after excluding design-only fields, S.No/serial fields, names, codes, dates, and summary-only values.");
+    }
+    return rowLevelCounts.mismatch
+      ? matrixStatus("NOT OK", `${rowLevelCounts.mismatch} row-level mismatch(es) found across selected Excel reports. ${crossExcelMismatchValueDetail({ mismatchRows: rowLevelCounts.mismatchRows }, profile)}`)
+      : matrixStatus("OK", `${rowLevelCounts.match} row-level comparable value(s) matched across selected Excel reports.`);
+  }
+  if (/\b(font|colour|color|bold|logo|alignment|align|style|border|page\s+setup|chart|graph|header\s+summary|page\s+number)\b/.test(text)) {
+    return matrixStatus("NA", "This is a design/visual checklist point, so it is not used as an Excel data-validation rule.");
   }
   return matrixStatus("OK", "Workbook data is readable for this validation point.");
 }
