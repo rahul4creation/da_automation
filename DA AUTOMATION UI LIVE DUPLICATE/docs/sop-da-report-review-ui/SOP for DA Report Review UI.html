@@ -274,7 +274,7 @@ API_PORT=8802</pre>
     <li>SAIFI/SAIDI reports should be validated with SAIFI/SAIDI reports.</li>
     <li>For SAIFI/SAIDI hierarchy validation, Feeder Wise is the base report. Child reports such as Circle, Division, Subdivision, Zone, and Feeder Category are checked by grouping Feeder Wise data to the matching hierarchy level.</li>
     <li>Unrelated families such as Analog and SAIFI/SAIDI should not be cross-compared as direct report pairs.</li>
-    <li>If selected reports are mixed or not recognized as one family, the output is categorized under <strong>Misslaneous</strong>.</li>
+    <li>If selected reports are mixed or not recognized as one family, the output is categorized under <strong>Miscellaneous</strong>.</li>
   </ul>
 
   <h2>12. Checklist Workbook Editor</h2>
@@ -342,7 +342,7 @@ API_PORT=8802</pre>
     <tbody>
       <tr><td><strong>Analog Reports</strong></td><td>Selected Excel report headers indicate Analog reports only.</td><td><code>D:\AIReview\project\UPCL REPORT\Analog Reports\20-07-2026 16-04-50\</code></td></tr>
       <tr><td><strong>Saifi Saidi Reports</strong></td><td>Selected Excel report headers indicate SAIFI/SAIDI reports only.</td><td><code>D:\AIReview\project\UPCL REPORT\Saifi Saidi Reports\20-07-2026 16-04-50\</code></td></tr>
-      <tr><td><strong>Misslaneous</strong></td><td>Selected files are mixed, unknown, or not one recognized family.</td><td><code>D:\AIReview\project\UPCL REPORT\Misslaneous\20-07-2026 16-04-50\</code></td></tr>
+      <tr><td><strong>Miscellaneous</strong></td><td>Selected files are mixed, unknown, or not one recognized family.</td><td><code>D:\AIReview\project\UPCL REPORT\Miscellaneous\20-07-2026 16-04-50\</code></td></tr>
     </tbody>
   </table>
   <div class="warning"><strong>Windows folder-name rule:</strong> The UI displays date/time as <strong>dd-mm-yyyy hh:mm:ss</strong>, but the actual timestamp folder uses hyphens in the time, for example <strong>20-07-2026 16-04-50</strong>, because Windows folder names cannot contain colons.</div>
@@ -379,7 +379,7 @@ API_PORT=8802</pre>
       <tr><td>1</td><td>Confirm login user.</td><td>Reviewer name in output matches the logged-in UI user.</td></tr>
       <tr><td>2</td><td>Confirm project name.</td><td>Output path is under <code>D:\AIReview\project\&lt;Project Name&gt;</code>.</td></tr>
       <tr><td>3</td><td>Confirm selected checklist and Excel reports.</td><td>Selected files match the reports intended for review.</td></tr>
-      <tr><td>4</td><td>Check report-family category folder.</td><td>Analog, SAIFI/SAIDI, or Misslaneous folder is created correctly based on report header names.</td></tr>
+      <tr><td>4</td><td>Check report-family category folder.</td><td>Analog, SAIFI/SAIDI, or Miscellaneous folder is created correctly based on report header names.</td></tr>
       <tr><td>5</td><td>Open Correction Observations.</td><td>Data and Design observations are listed separately with actionable correction text.</td></tr>
       <tr><td>6</td><td>Open generated PDF/TXT files from repository.</td><td>PDF/TXT files match the latest timestamp folder and contain the same matrix/correction details.</td></tr>
       <tr><td>7</td><td>Refresh browser.</td><td>Previous output is not loaded into the UI by default. Repository can be refreshed when files need to be viewed again.</td></tr>

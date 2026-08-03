@@ -143,10 +143,10 @@
     <h1>SOP for DA Report Review UI</h1>
     <p class="subtitle">Step-by-step standard operating procedure for installing, running, and using the DA Automation duplicate UI for Excel report review.</p>
     <div class="meta">
-      <div><strong>UI URL</strong><br/>http://127.0.0.3:5190/</div>
+      <div><strong>UI URL</strong><br/>http://192.168.29.137:5190/</div>
       <div><strong>API URL</strong><br/>http://127.0.0.3:8802/</div>
       <div><strong>User Access</strong><br/>Use assigned UI credentials</div>
-      <div><strong>Prepared On</strong><br/>20/07/2026 18:52:11</div>
+      <div><strong>Prepared On</strong><br/>03/08/2026 18:57:43</div>
     </div>
     <p>
       <span class="tag">Excel-only validation</span>
@@ -205,8 +205,8 @@ API_PORT=8802</pre>
       <tr><td>Open UI folder</td><td><code>cd /d "D:\AIReview\da_automation\DA AUTOMATION UI"</code></td><td>Command prompt is inside the UI project folder.</td></tr>
       <tr><td>Install packages</td><td><code>npm install</code></td><td><code>node_modules</code> is installed or refreshed.</td></tr>
       <tr><td>Start API server</td><td><code>npm run dev:server</code></td><td>API starts on <code>http://127.0.0.3:8802/</code>.</td></tr>
-      <tr><td>Start UI client</td><td><code>npm run dev:client</code></td><td>Vite UI starts on <code>http://127.0.0.3:5190/</code>.</td></tr>
-      <tr><td>Open browser</td><td><code>http://127.0.0.3:5190/</code></td><td>Login screen appears.</td></tr>
+      <tr><td>Start UI client</td><td><code>npm run dev:client</code></td><td>Vite UI starts on <code>http://192.168.29.137:5190/</code>.</td></tr>
+      <tr><td>Open browser</td><td><code>http://192.168.29.137:5190/</code></td><td>Login screen appears.</td></tr>
     </tbody>
   </table>
   <p>Alternative single-command startup: run <code>npm run dev</code> from the UI folder. This starts server and client together.</p>
@@ -214,7 +214,7 @@ API_PORT=8802</pre>
   <h2>6. Login and Logout</h2>
   <div class="figure"><img src="screenshots/01-login-screen.png" /><div class="caption">Screenshot 1: Login screen for Report & Dashboard Review.</div></div>
   <ol>
-    <li>Open <strong>http://127.0.0.3:5190/</strong>.</li>
+    <li>Open <strong>http://192.168.29.137:5190/</strong>.</li>
     <li>Enter the assigned username.</li>
     <li>Enter the assigned password. Admin credentials are not printed in this SOP.</li>
     <li>Click <strong>Sign In</strong>.</li>
@@ -274,7 +274,7 @@ API_PORT=8802</pre>
     <li>SAIFI/SAIDI reports should be validated with SAIFI/SAIDI reports.</li>
     <li>For SAIFI/SAIDI hierarchy validation, Feeder Wise is the base report. Child reports such as Circle, Division, Subdivision, Zone, and Feeder Category are checked by grouping Feeder Wise data to the matching hierarchy level.</li>
     <li>Unrelated families such as Analog and SAIFI/SAIDI should not be cross-compared as direct report pairs.</li>
-    <li>If selected reports are mixed or not recognized as one family, the output is categorized under <strong>Misslaneous</strong>.</li>
+    <li>If selected reports are mixed or not recognized as one family, the output is categorized under <strong>Miscellaneous</strong>.</li>
   </ul>
 
   <h2>12. Checklist Workbook Editor</h2>
@@ -342,7 +342,7 @@ API_PORT=8802</pre>
     <tbody>
       <tr><td><strong>Analog Reports</strong></td><td>Selected Excel report headers indicate Analog reports only.</td><td><code>D:\AIReview\project\UPCL REPORT\Analog Reports\20-07-2026 16-04-50\</code></td></tr>
       <tr><td><strong>Saifi Saidi Reports</strong></td><td>Selected Excel report headers indicate SAIFI/SAIDI reports only.</td><td><code>D:\AIReview\project\UPCL REPORT\Saifi Saidi Reports\20-07-2026 16-04-50\</code></td></tr>
-      <tr><td><strong>Misslaneous</strong></td><td>Selected files are mixed, unknown, or not one recognized family.</td><td><code>D:\AIReview\project\UPCL REPORT\Misslaneous\20-07-2026 16-04-50\</code></td></tr>
+      <tr><td><strong>Miscellaneous</strong></td><td>Selected files are mixed, unknown, or not one recognized family.</td><td><code>D:\AIReview\project\UPCL REPORT\Miscellaneous\20-07-2026 16-04-50\</code></td></tr>
     </tbody>
   </table>
   <div class="warning"><strong>Windows folder-name rule:</strong> The UI displays date/time as <strong>dd-mm-yyyy hh:mm:ss</strong>, but the actual timestamp folder uses hyphens in the time, for example <strong>20-07-2026 16-04-50</strong>, because Windows folder names cannot contain colons.</div>
@@ -379,7 +379,7 @@ API_PORT=8802</pre>
       <tr><td>1</td><td>Confirm login user.</td><td>Reviewer name in output matches the logged-in UI user.</td></tr>
       <tr><td>2</td><td>Confirm project name.</td><td>Output path is under <code>D:\AIReview\project\&lt;Project Name&gt;</code>.</td></tr>
       <tr><td>3</td><td>Confirm selected checklist and Excel reports.</td><td>Selected files match the reports intended for review.</td></tr>
-      <tr><td>4</td><td>Check report-family category folder.</td><td>Analog, SAIFI/SAIDI, or Misslaneous folder is created correctly based on report header names.</td></tr>
+      <tr><td>4</td><td>Check report-family category folder.</td><td>Analog, SAIFI/SAIDI, or Miscellaneous folder is created correctly based on report header names.</td></tr>
       <tr><td>5</td><td>Open Correction Observations.</td><td>Data and Design observations are listed separately with actionable correction text.</td></tr>
       <tr><td>6</td><td>Open generated PDF/TXT files from repository.</td><td>PDF/TXT files match the latest timestamp folder and contain the same matrix/correction details.</td></tr>
       <tr><td>7</td><td>Refresh browser.</td><td>Previous output is not loaded into the UI by default. Repository can be refreshed when files need to be viewed again.</td></tr>
@@ -390,7 +390,7 @@ API_PORT=8802</pre>
   <table>
     <thead><tr><th>Issue</th><th>Action</th></tr></thead>
     <tbody>
-      <tr><td>UI does not open</td><td>Confirm <code>npm run dev:client</code> is running and open <code>http://127.0.0.3:5190/</code>.</td></tr>
+      <tr><td>UI does not open</td><td>Confirm <code>npm run dev:client</code> is running and open <code>http://192.168.29.137:5190/</code>.</td></tr>
       <tr><td>API requests fail</td><td>Confirm <code>npm run dev:server</code> is running on <code>http://127.0.0.3:8802/</code>.</td></tr>
       <tr><td>Port already used</td><td>Stop the old process or change APP_PORT/API_PORT in <code>.env</code>.</td></tr>
       <tr><td>Run Review disabled</td><td>Enter project name and select checklist plus Excel report files.</td></tr>
@@ -401,6 +401,6 @@ API_PORT=8802</pre>
     </tbody>
   </table>
 
-  <p class="footer-note">Prepared for the local DA Automation duplicate UI. This SOP describes the current UI behavior at http://127.0.0.3:5190/ as of 20/07/2026 18:52:11.</p>
+  <p class="footer-note">Prepared for the local DA Automation duplicate UI. This SOP describes the current UI behavior at http://192.168.29.137:5190/ as of 03/08/2026 18:57:43.</p>
 </body>
 </html>

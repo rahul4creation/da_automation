@@ -3678,7 +3678,7 @@ function reviewReportCategoryFolderFromExcelFiles(files = []) {
   );
   if (families.size === 1 && families.has("analog")) return "Analog Reports";
   if (families.size === 1 && families.has("saifi-saidi")) return "Saifi Saidi Reports";
-  return "Misslaneous";
+  return "Miscellaneous";
 }
 
 function inferReviewReportFamilyFromExcelFile(file = {}) {
