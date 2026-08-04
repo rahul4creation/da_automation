@@ -483,6 +483,15 @@ export default function ExcelPdfReviewApp({ username, userType = "User", default
     () => correctionObservations.filter((observation) => isDesignCorrectionObservation(observation)),
     [correctionObservations]
   );
+  const dataCorrectionObservationCount = useMemo(
+    () => countCorrectionObservationSerials(dataCorrectionObservations),
+    [dataCorrectionObservations]
+  );
+  const designCorrectionObservationCount = useMemo(
+    () => countCorrectionObservationSerials(designCorrectionObservations),
+    [designCorrectionObservations]
+  );
+  const totalCorrectionObservationCount = dataCorrectionObservationCount + designCorrectionObservationCount;
   const crossPdfSummary = useMemo(
     () => {
       const hierarchySummary = reviewSummary?.qualityChecks?.find((check) => check.id === "hierarchy-validation") || null;
@@ -1472,7 +1481,7 @@ export default function ExcelPdfReviewApp({ username, userType = "User", default
                 <span>Correction Observations From Review Files</span>
               </div>
               <span className="gate-count-pill">
-                {correctionObservations.length} checklist corrections
+                {totalCorrectionObservationCount} checklist corrections
               </span>
             </div>
             <div className="findings-count-note">
@@ -1482,12 +1491,14 @@ export default function ExcelPdfReviewApp({ username, userType = "User", default
               <div className="correction-observation-groups">
                 <CorrectionObservationGroup
                   emptyText="No data correction observations found in the latest review files."
+                  observationCount={dataCorrectionObservationCount}
                   observations={dataCorrectionObservations}
                   title="Data Correction Observations"
                   tone="data"
                 />
                 <CorrectionObservationGroup
                   emptyText="No design correction observations found in the latest review files."
+                  observationCount={designCorrectionObservationCount}
                   observations={designCorrectionObservations}
                   title="Design Correction Observations"
                   tone="design"
@@ -1710,11 +1721,13 @@ function MultiFileSelection({
 
 function CorrectionObservationGroup({
   emptyText,
+  observationCount,
   observations,
   title,
   tone
 }: {
   emptyText: string;
+  observationCount: number;
   observations: CorrectionObservation[];
   title: string;
   tone: "data" | "design";
@@ -1724,7 +1737,7 @@ function CorrectionObservationGroup({
     <div className={`correction-observation-group ${tone}`}>
       <div className="correction-observation-group-head">
         <strong>{title}</strong>
-        <span>{observations.length} Not OK</span>
+        <span>{observationCount} Not OK</span>
       </div>
       {observations.length ? (
         <div className="correction-observation-table-wrap">
@@ -1803,6 +1816,12 @@ function buildCorrectionObservationMatrix(observations: CorrectionObservation[])
     row.remarks.push(`${report}: ${evidence}`);
   });
   return { reports, rows: [...rows.values()] };
+}
+
+function countCorrectionObservationSerials(observations: CorrectionObservation[]) {
+  const rows = buildCorrectionObservationMatrix(observations).rows;
+  const serials = new Set(rows.map((row) => row.sNo));
+  return serials.size || rows.length;
 }
 
 function uniqueOrderedStrings(values: string[]) {
