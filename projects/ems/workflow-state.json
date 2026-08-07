@@ -1,0 +1,56 @@
+{
+  "projectId": "ems",
+  "projectName": "EMS",
+  "owner": "Pankaj_Mishra",
+  "ownerUserName": "Pankaj_Mishra",
+  "createdByUserName": "Pankaj_Mishra",
+  "targetPlatform": "FlexReport",
+  "status": "active",
+  "currentPhaseId": "01-requirement-intake",
+  "createdAt": "2026-07-29T13:23:03.362Z",
+  "updatedAt": "2026-07-29T13:23:03.362Z",
+  "phases": {
+    "01-requirement-intake": {
+      "status": "in-progress",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-29T13:23:03.362Z"
+    },
+    "02-ai-analysis-understanding": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-29T13:23:03.362Z"
+    },
+    "03-sql-draft-logic-preparation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-29T13:23:03.362Z"
+    },
+    "04-dashboard-report-development": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-29T13:23:03.362Z"
+    },
+    "05-ai-review-validation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-29T13:23:03.362Z"
+    },
+    "06-testing-verification": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-29T13:23:03.362Z"
+    },
+    "07-approval-delivery": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-29T13:23:03.362Z"
+    }
+  }
+}

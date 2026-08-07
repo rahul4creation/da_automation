@@ -1,0 +1,193 @@
+{
+  "projectContext": [
+    {
+      "item": "Project ID",
+      "requiredCondition": "Stable project_id is known and uses lowercase letters, digits, hyphens, and underscores.",
+      "status": "Complete",
+      "evidence": "001",
+      "owner": "Aditya",
+      "notes": ""
+    },
+    {
+      "item": "Project workspace",
+      "requiredCondition": "Project artifact root exists or will be created under projects/<project_id>/.",
+      "status": "Complete",
+      "evidence": "projects/001",
+      "owner": "Aditya",
+      "notes": ""
+    },
+    {
+      "item": "Project control file",
+      "requiredCondition": "PROJECT.md exists or will be created for the project.",
+      "status": "Complete",
+      "evidence": "projects/001/PROJECT.md",
+      "owner": "Aditya",
+      "notes": ""
+    },
+    {
+      "item": "Current phase",
+      "requiredCondition": "Active phase is known.",
+      "status": "Complete",
+      "evidence": "01-requirement-intake",
+      "owner": "Aditya",
+      "notes": ""
+    },
+    {
+      "item": "Artifact path",
+      "requiredCondition": "Output location for the current artifact is known.",
+      "status": "Complete",
+      "evidence": "projects/001/phases/01-requirement-intake/requirement-brief.md",
+      "owner": "Aditya",
+      "notes": ""
+    },
+    {
+      "item": "Project owner",
+      "requiredCondition": "Business owner, requester, or proxy owner is known.",
+      "status": "Complete",
+      "evidence": "Aditya",
+      "owner": "Aditya",
+      "notes": ""
+    },
+    {
+      "item": "Cross-project scope",
+      "requiredCondition": "If multiple projects are affected, each project_id is listed.",
+      "status": "Not applicable",
+      "evidence": "Single project workspace.",
+      "owner": "Aditya",
+      "notes": "No cross-project scope declared."
+    }
+  ],
+  "entry": [
+    {
+      "item": "Project context ready",
+      "requiredCondition": "Project Context Gate is complete.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Request received",
+      "requiredCondition": "Raw request, ticket, screenshot, email, meeting note, or user prompt exists.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Request owner known",
+      "requiredCondition": "Business requester or proxy owner is identified.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Intake scope known",
+      "requiredCondition": "New report, dashboard, enhancement, migration, audit, or defect is identified.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Initial business area known",
+      "requiredCondition": "Domain, team, process, or subject area is identified.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "exit": [
+    {
+      "item": "Business objective",
+      "requiredCondition": "Objective and decision supported by the artifact are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Stakeholders",
+      "requiredCondition": "Audience, business owner, technical owner if known, and approver are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Platform path",
+      "requiredCondition": "Grafana, FlexReport, Superset, or platform decision criteria are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "KPI catalog",
+      "requiredCondition": "Each KPI has definition, formula or open question, grain, owner, and status.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Dimensions and filters",
+      "requiredCondition": "Required dimensions, filters, defaults, and allowed values are captured or questioned.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Time logic",
+      "requiredCondition": "Date basis, time range, timezone, refresh need, and comparison period are captured or questioned.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Data expectations",
+      "requiredCondition": "Known source systems, tables, files, reports, or data owners are listed.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Security and delivery",
+      "requiredCondition": "Access, export, schedule, environment, and delivery expectations are captured.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Acceptance criteria",
+      "requiredCondition": "Testable acceptance criteria exist for business, data, and user experience.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Open questions",
+      "requiredCondition": "Open questions have priority, owner, and impact.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Scope decision",
+      "requiredCondition": "In-scope and out-of-scope items are separated.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "updatedAt": "2026-07-27T07:02:43.170Z"
+}

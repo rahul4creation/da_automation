@@ -1,0 +1,177 @@
+{
+  "projectContext": [
+    {
+      "item": "Project ID",
+      "requiredCondition": "Stable project_id is known and uses lowercase letters, digits, hyphens, and underscores.",
+      "status": "Complete",
+      "evidence": "grafana",
+      "owner": "Rahul_Raj",
+      "notes": ""
+    },
+    {
+      "item": "Project workspace",
+      "requiredCondition": "Project artifact root exists or will be created under projects/<project_id>/.",
+      "status": "Complete",
+      "evidence": "projects/grafana",
+      "owner": "Rahul_Raj",
+      "notes": ""
+    },
+    {
+      "item": "Project control file",
+      "requiredCondition": "PROJECT.md exists or will be created for the project.",
+      "status": "Complete",
+      "evidence": "projects/grafana/PROJECT.md",
+      "owner": "Rahul_Raj",
+      "notes": ""
+    },
+    {
+      "item": "Current phase",
+      "requiredCondition": "Active phase is known.",
+      "status": "Complete",
+      "evidence": "01-requirement-intake",
+      "owner": "Rahul_Raj",
+      "notes": ""
+    },
+    {
+      "item": "Artifact path",
+      "requiredCondition": "Output location for the current artifact is known.",
+      "status": "Complete",
+      "evidence": "projects/grafana/phases/04-dashboard-report-development/build-notes.md",
+      "owner": "Rahul_Raj",
+      "notes": ""
+    },
+    {
+      "item": "Project owner",
+      "requiredCondition": "Business owner, requester, or proxy owner is known.",
+      "status": "Complete",
+      "evidence": "Rahul_Raj",
+      "owner": "Rahul_Raj",
+      "notes": ""
+    },
+    {
+      "item": "Cross-project scope",
+      "requiredCondition": "If multiple projects are affected, each project_id is listed.",
+      "status": "Not applicable",
+      "evidence": "Single project workspace.",
+      "owner": "Rahul_Raj",
+      "notes": "No cross-project scope declared."
+    }
+  ],
+  "entry": [
+    {
+      "item": "Project context ready",
+      "requiredCondition": "Project Context Gate is complete for the same project_id as Phase 3.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "SQL ready",
+      "requiredCondition": "SQL draft and validation notes are available.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Platform chosen",
+      "requiredCondition": "Grafana, FlexReport, or Superset target is selected.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Requirements ready",
+      "requiredCondition": "Requirement brief and acceptance criteria are available.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Build access path",
+      "requiredCondition": "Workspace, environment, owner, or implementation path is known.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "exit": [
+    {
+      "item": "Artifact structure",
+      "requiredCondition": "Pages, sections, panels, charts, report bands, or exports are defined.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Visual inventory",
+      "requiredCondition": "Every required KPI/output maps to a visual, table, report field, export, or documented exclusion.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Dataset inventory",
+      "requiredCondition": "Every component has source SQL or dataset reference, grain, and owner.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Filter behavior",
+      "requiredCondition": "Filter defaults, scope, interactions, and date controls are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Naming consistency",
+      "requiredCondition": "Artifact, sections, fields, filters, metrics, and datasets follow consistent names.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Platform behavior",
+      "requiredCondition": "Refresh, alerts, export, print, drill-down, or scheduling details are documented as applicable.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Access expectations",
+      "requiredCondition": "Roles, sensitive data, row-level security, and export permissions are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Build evidence",
+      "requiredCondition": "Screenshot, configuration note, link, export, or implementation checklist exists.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Development issues",
+      "requiredCondition": "Known issues have severity, owner, and next action.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "updatedAt": "2026-07-23T13:53:15.934Z"
+}

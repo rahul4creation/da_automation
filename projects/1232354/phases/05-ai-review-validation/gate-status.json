@@ -1,0 +1,153 @@
+{
+  "projectContext": [
+    {
+      "item": "Project ID",
+      "requiredCondition": "Stable project_id is known and uses lowercase letters, digits, hyphens, and underscores.",
+      "status": "Complete",
+      "evidence": "1232354",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Project workspace",
+      "requiredCondition": "Project artifact root exists or will be created under projects/<project_id>/.",
+      "status": "Complete",
+      "evidence": "projects/1232354",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Project control file",
+      "requiredCondition": "PROJECT.md exists or will be created for the project.",
+      "status": "Complete",
+      "evidence": "projects/1232354/PROJECT.md",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Current phase",
+      "requiredCondition": "Active phase is known.",
+      "status": "Complete",
+      "evidence": "01-requirement-intake",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Artifact path",
+      "requiredCondition": "Output location for the current artifact is known.",
+      "status": "Complete",
+      "evidence": "projects/1232354/phases/05-ai-review-validation/review-log.md",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Project owner",
+      "requiredCondition": "Business owner, requester, or proxy owner is known.",
+      "status": "Complete",
+      "evidence": "Prashant",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Cross-project scope",
+      "requiredCondition": "If multiple projects are affected, each project_id is listed.",
+      "status": "Not applicable",
+      "evidence": "Single project workspace.",
+      "owner": "Prashant",
+      "notes": "No cross-project scope declared."
+    }
+  ],
+  "entry": [
+    {
+      "item": "Project context ready",
+      "requiredCondition": "Project Context Gate is complete for the same project_id as Phase 4.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Review artifacts",
+      "requiredCondition": "Requirement brief, mapping, SQL, build notes, and available screenshots/exports are available.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Review scope",
+      "requiredCondition": "SQL, visual/report, filter, access, performance, and governance scope is defined.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Acceptance criteria",
+      "requiredCondition": "Criteria from Phase 1 are available for coverage review.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "exit": [
+    {
+      "item": "Coverage matrix",
+      "requiredCondition": "Each requirement has SQL, visual/report, and validation coverage status.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "SQL review",
+      "requiredCondition": "Joins, filters, aggregation, KPI formulas, date logic, null handling, and duplicate risks are reviewed.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "UX/report review",
+      "requiredCondition": "Layout, naming, units, formatting, filters, exports, and user flow are reviewed.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Governance review",
+      "requiredCondition": "Access, ownership, documentation, and consistency across reports are reviewed.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Findings logged",
+      "requiredCondition": "Findings have severity, evidence, recommendation, owner, and blocking status.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Critical/high resolution",
+      "requiredCondition": "Critical and high findings are fixed or formally accepted with owner and impact.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Testing focus",
+      "requiredCondition": "Required test cases and high-risk areas for Phase 6 are identified.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "updatedAt": "2026-07-28T06:53:36.402Z"
+}

@@ -1,0 +1,54 @@
+{
+  "projectId": "m",
+  "projectName": "MPPTCL REPORT",
+  "owner": "",
+  "targetPlatform": "FlexReport",
+  "status": "active",
+  "currentPhaseId": "01-requirement-intake",
+  "createdAt": "2026-07-14T10:36:57.712Z",
+  "updatedAt": "2026-07-14T10:37:20.494Z",
+  "phases": {
+    "01-requirement-intake": {
+      "status": "in-progress",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-14T10:36:57.712Z"
+    },
+    "02-ai-analysis-understanding": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-14T10:36:57.712Z"
+    },
+    "03-sql-draft-logic-preparation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-14T10:36:57.712Z"
+    },
+    "04-dashboard-report-development": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-14T10:36:57.712Z"
+    },
+    "05-ai-review-validation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-14T10:36:57.712Z"
+    },
+    "06-testing-verification": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-14T10:36:57.712Z"
+    },
+    "07-approval-delivery": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-14T10:36:57.712Z"
+    }
+  }
+}

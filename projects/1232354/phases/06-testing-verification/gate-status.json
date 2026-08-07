@@ -1,0 +1,177 @@
+{
+  "projectContext": [
+    {
+      "item": "Project ID",
+      "requiredCondition": "Stable project_id is known and uses lowercase letters, digits, hyphens, and underscores.",
+      "status": "Complete",
+      "evidence": "1232354",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Project workspace",
+      "requiredCondition": "Project artifact root exists or will be created under projects/<project_id>/.",
+      "status": "Complete",
+      "evidence": "projects/1232354",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Project control file",
+      "requiredCondition": "PROJECT.md exists or will be created for the project.",
+      "status": "Complete",
+      "evidence": "projects/1232354/PROJECT.md",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Current phase",
+      "requiredCondition": "Active phase is known.",
+      "status": "Complete",
+      "evidence": "01-requirement-intake",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Artifact path",
+      "requiredCondition": "Output location for the current artifact is known.",
+      "status": "Complete",
+      "evidence": "projects/1232354/phases/06-testing-verification/test-log.md",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Project owner",
+      "requiredCondition": "Business owner, requester, or proxy owner is known.",
+      "status": "Complete",
+      "evidence": "Prashant",
+      "owner": "Prashant",
+      "notes": ""
+    },
+    {
+      "item": "Cross-project scope",
+      "requiredCondition": "If multiple projects are affected, each project_id is listed.",
+      "status": "Not applicable",
+      "evidence": "Single project workspace.",
+      "owner": "Prashant",
+      "notes": "No cross-project scope declared."
+    }
+  ],
+  "entry": [
+    {
+      "item": "Project context ready",
+      "requiredCondition": "Project Context Gate is complete for the same project_id as Phase 5.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Review completed",
+      "requiredCondition": "Phase 5 findings are resolved, assigned, or accepted.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Testable artifact",
+      "requiredCondition": "Dashboard/report/query/export is available in a testable environment.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Expected results",
+      "requiredCondition": "Trusted source, sample, prior report, or stakeholder expected values are available.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Test access",
+      "requiredCondition": "Required roles, credentials, exports, and environment access are available or assigned.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "exit": [
+    {
+      "item": "Acceptance coverage",
+      "requiredCondition": "Every acceptance criterion has a test result.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Data tests",
+      "requiredCondition": "KPI totals, source reconciliation, joins, filters, nulls, duplicates, and date boundaries are tested.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "UI/report tests",
+      "requiredCondition": "Visuals, sorting, formatting, drill-downs, exports, print, and empty states are tested as applicable.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Access tests",
+      "requiredCondition": "Role visibility, row restrictions, sensitive fields, and export permissions are tested where applicable.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Performance tests",
+      "requiredCondition": "Load time, query time, large date ranges, and refresh behavior are tested or marked not applicable.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Evidence captured",
+      "requiredCondition": "Query results, screenshots, exports, or notes are captured for each test.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Defects resolved",
+      "requiredCondition": "Critical/high defects are fixed or accepted as risks with owner approval.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Retest done",
+      "requiredCondition": "Fixed defects have retest status.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Release recommendation",
+      "requiredCondition": "Pass, blocked, or pass with accepted risks is documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "updatedAt": "2026-07-28T06:53:36.405Z"
+}

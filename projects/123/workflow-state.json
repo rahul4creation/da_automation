@@ -1,0 +1,56 @@
+{
+  "projectId": "123",
+  "projectName": "MPPTCL",
+  "owner": "Aditya",
+  "ownerUserName": "Aditya",
+  "createdByUserName": "Aditya",
+  "targetPlatform": "FlexReport",
+  "status": "active",
+  "currentPhaseId": "01-requirement-intake",
+  "createdAt": "2026-07-28T06:34:33.771Z",
+  "updatedAt": "2026-07-28T06:34:33.771Z",
+  "phases": {
+    "01-requirement-intake": {
+      "status": "in-progress",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-28T06:34:33.771Z"
+    },
+    "02-ai-analysis-understanding": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-28T06:34:33.771Z"
+    },
+    "03-sql-draft-logic-preparation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-28T06:34:33.771Z"
+    },
+    "04-dashboard-report-development": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-28T06:34:33.771Z"
+    },
+    "05-ai-review-validation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-28T06:34:33.771Z"
+    },
+    "06-testing-verification": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-28T06:34:33.771Z"
+    },
+    "07-approval-delivery": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-07-28T06:34:33.771Z"
+    }
+  }
+}

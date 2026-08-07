@@ -1,12 +1,12 @@
 {
   "projectId": "project_id",
-  "projectName": "upcl",
+  "projectName": "UPCL REPORT",
   "owner": "Admin",
   "targetPlatform": "FlexReport",
   "status": "active",
-  "currentPhaseId": "01-requirement-intake",
+  "currentPhaseId": "05-ai-review-validation",
   "createdAt": "2026-07-07T09:39:38.182Z",
-  "updatedAt": "2026-07-07T09:39:38.182Z",
+  "updatedAt": "2026-07-09T06:29:03.032Z",
   "phases": {
     "01-requirement-intake": {
       "status": "in-progress",
@@ -30,13 +30,14 @@
       "status": "not-started",
       "gateRecommendation": "TBD",
       "lastArtifact": "",
-      "updatedAt": "2026-07-07T09:39:38.182Z"
+      "updatedAt": "2026-07-09T06:28:30.963Z",
+      "title": "Report Development"
     },
     "05-ai-review-validation": {
-      "status": "not-started",
-      "gateRecommendation": "TBD",
-      "lastArtifact": "",
-      "updatedAt": "2026-07-07T09:39:38.182Z"
+      "status": "in-progress",
+      "gateRecommendation": "No-go: gate blockers remain",
+      "lastArtifact": "projects/project_id/phases/05-ai-review-validation/review-log.md",
+      "updatedAt": "2026-07-07T12:03:39.980Z"
     },
     "06-testing-verification": {
       "status": "not-started",

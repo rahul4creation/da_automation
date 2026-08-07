@@ -1,0 +1,169 @@
+{
+  "projectContext": [
+    {
+      "item": "Project ID",
+      "requiredCondition": "Stable project_id is known and uses lowercase letters, digits, hyphens, and underscores.",
+      "status": "Complete",
+      "evidence": "ems",
+      "owner": "Pankaj_Mishra",
+      "notes": ""
+    },
+    {
+      "item": "Project workspace",
+      "requiredCondition": "Project artifact root exists or will be created under projects/<project_id>/.",
+      "status": "Complete",
+      "evidence": "projects/ems",
+      "owner": "Pankaj_Mishra",
+      "notes": ""
+    },
+    {
+      "item": "Project control file",
+      "requiredCondition": "PROJECT.md exists or will be created for the project.",
+      "status": "Complete",
+      "evidence": "projects/ems/PROJECT.md",
+      "owner": "Pankaj_Mishra",
+      "notes": ""
+    },
+    {
+      "item": "Current phase",
+      "requiredCondition": "Active phase is known.",
+      "status": "Complete",
+      "evidence": "01-requirement-intake",
+      "owner": "Pankaj_Mishra",
+      "notes": ""
+    },
+    {
+      "item": "Artifact path",
+      "requiredCondition": "Output location for the current artifact is known.",
+      "status": "Complete",
+      "evidence": "projects/ems/phases/03-sql-draft-logic-preparation/sql-logic-notes.md",
+      "owner": "Pankaj_Mishra",
+      "notes": ""
+    },
+    {
+      "item": "Project owner",
+      "requiredCondition": "Business owner, requester, or proxy owner is known.",
+      "status": "Complete",
+      "evidence": "Pankaj_Mishra",
+      "owner": "Pankaj_Mishra",
+      "notes": ""
+    },
+    {
+      "item": "Cross-project scope",
+      "requiredCondition": "If multiple projects are affected, each project_id is listed.",
+      "status": "Not applicable",
+      "evidence": "Single project workspace.",
+      "owner": "Pankaj_Mishra",
+      "notes": "No cross-project scope declared."
+    }
+  ],
+  "entry": [
+    {
+      "item": "Project context ready",
+      "requiredCondition": "Project Context Gate is complete for the same project_id as Phase 2.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Mapping ready",
+      "requiredCondition": "Phase 2 mapping is complete or unresolved items have accepted risks.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Schema available",
+      "requiredCondition": "Required table and column structure is available.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "KPI rules available",
+      "requiredCondition": "KPI formulas, filters, grain, and date logic are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "SQL target known",
+      "requiredCondition": "Dashboard query, dataset, view, materialized view, export, or report dataset target is known.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "exit": [
+    {
+      "item": "Main SQL draft",
+      "requiredCondition": "PostgreSQL draft exists with named CTEs or a clear equivalent structure.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Traceability",
+      "requiredCondition": "Every selected column and KPI traces to a requirement or mapping item.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Parameters",
+      "requiredCondition": "Date range, filters, role constraints, and optional parameters are defined.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Join safety",
+      "requiredCondition": "Join type, keys, cardinality expectation, and duplicate handling are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "KPI correctness",
+      "requiredCondition": "Formulas, aggregation grain, null handling, divide-by-zero handling, and units are implemented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Validation queries",
+      "requiredCondition": "Row count, duplicate, null, date, filter, and KPI reconciliation checks are provided.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Performance notes",
+      "requiredCondition": "Large table, filter, index/key, caching, and materialization risks are noted where relevant.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Review notes",
+      "requiredCondition": "Assumptions, open questions, and review focus areas are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "updatedAt": "2026-07-29T13:23:03.366Z"
+}

@@ -1,0 +1,5 @@
+{
+  "review_scope": "Use generated Excel/PDF review files, quality checks, findings, and reconciliation evidence.",
+  "known_findings": "Use generated high findings from review files.",
+  "review_evidence": "Latest generated review JSON and Markdown repository files."
+}
