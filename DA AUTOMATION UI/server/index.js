@@ -2689,6 +2689,65 @@ function reviewSummaryCorrectionObservations(result, findings = []) {
     }
   }
 
+  for (const pair of result.abstract_data_validation?.pairwise || []) {
+    const mismatches = (pair.comparisons || []).filter((comparison) => isMismatchStatus(comparison.state));
+    if (!mismatches.length) continue;
+    const reportPair = [pair.left_report, pair.right_report].filter(Boolean).join(" vs ");
+    const examples = mismatches
+      .slice(0, 5)
+      .map((comparison) => comparison.evidence || [
+        comparison.metric ? `${humanizeMetricName(comparison.metric)}:` : "",
+        labeledComparisonValue(pair.left_report, "Report 1", comparison.left_display_value ?? comparison.left_value),
+        labeledComparisonValue(pair.right_report, "Report 2", comparison.right_display_value ?? comparison.right_value)
+      ].filter(Boolean).join(" "))
+      .filter(Boolean);
+    const detail = [
+      `${mismatches.length} abstract/detail mismatch(es) found for ${reportPair || "selected reports"}.`,
+      pair.evidence,
+      examples.length ? `Examples: ${examples.join(" ")}` : ""
+    ].filter(Boolean).join(" ");
+    addObservation({
+      severity: "high",
+      area: "Data",
+      report: reportPair,
+      title: "Abstract Data Validation - Abstract Vs Detail-Row Sum",
+      detail,
+      recommendation: "Correct the abstract values or the visible detail rows so the abstract values reconcile with the same report period and filter context.",
+      checklistSNo: "Abstract",
+      state: "Not OK",
+      checkPoint: "Abstract Data Validation - Abstract Vs Detail-Row Sum",
+      observation: detail,
+      correctionRequired: "Correct the abstract values or the visible detail rows so the abstract values reconcile with the same report period and filter context."
+    });
+  }
+
+  for (const report of result.abstract_data_validation?.report_reconciliations || []) {
+    const mismatches = (report.comparisons || []).filter((comparison) => isMismatchStatus(comparison.state));
+    if (!mismatches.length) continue;
+    const examples = mismatches
+      .slice(0, 5)
+      .map((comparison) => comparison.evidence)
+      .filter(Boolean);
+    const detail = [
+      `${mismatches.length} abstract/detail mismatch(es) found in ${report.report || "selected report"}.`,
+      report.evidence,
+      examples.length ? `Examples: ${examples.join(" ")}` : ""
+    ].filter(Boolean).join(" ");
+    addObservation({
+      severity: "high",
+      area: "Data",
+      report: report.report || "",
+      title: "Abstract Vs Detail-Row Sum",
+      detail,
+      recommendation: "Correct the abstract value or the visible detail rows so the abstract value reconciles with the same report period and filter context.",
+      checklistSNo: "Abstract",
+      state: "Not OK",
+      checkPoint: "Abstract Vs Detail-Row Sum",
+      observation: detail,
+      correctionRequired: "Correct the abstract value or the visible detail rows so the abstract value reconciles with the same report period and filter context."
+    });
+  }
+
   if (observations.length) return observations;
 
   for (const observation of result.report_wise_observations || []) {
