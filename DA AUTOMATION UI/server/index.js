@@ -2610,7 +2610,8 @@ function reviewSummaryCorrectionObservations(result, findings = []) {
     state = "",
     checkPoint = "",
     observation = "",
-    correctionRequired = ""
+    correctionRequired = "",
+    matrixStates = null
   }) => {
     const cleanTitle = cleanObservationText(title);
     const cleanDetail = cleanObservationText(detail);
@@ -2633,7 +2634,14 @@ function reviewSummaryCorrectionObservations(result, findings = []) {
       state: cleanObservationText(state),
       checkPoint: cleanObservationText(checkPoint || cleanTitle),
       observation: cleanObservation || cleanDetail,
-      correctionRequired: cleanCorrectionRequired || defaultCorrectionRecommendation(area)
+      correctionRequired: cleanCorrectionRequired || defaultCorrectionRecommendation(area),
+      matrixStates: matrixStates && typeof matrixStates === "object"
+        ? Object.fromEntries(
+            Object.entries(matrixStates)
+              .map(([key, value]) => [cleanObservationText(key), cleanObservationText(value)])
+              .filter(([key, value]) => key && value)
+          )
+        : undefined
     });
   };
 
@@ -2643,6 +2651,12 @@ function reviewSummaryCorrectionObservations(result, findings = []) {
     column.detected_report_name || column.report_name || column.pdf_file || column.key
   ]));
   for (const row of result.data_validation_check_matrix?.rows || []) {
+    const matrixStates = Object.fromEntries(
+      Object.entries(row.statuses || {}).map(([statusKey, status]) => [
+        reportNameByKey.get(statusKey) || statusKey,
+        status?.display || status?.raw_status || ""
+      ])
+    );
     for (const [statusKey, status] of Object.entries(row.statuses || {})) {
       if (!isMismatchStatus(status?.display || status?.raw_status)) continue;
       const reportName = reportNameByKey.get(statusKey) || statusKey;
@@ -2658,7 +2672,8 @@ function reviewSummaryCorrectionObservations(result, findings = []) {
         state: status?.display || status?.raw_status || "Not OK",
         checkPoint: row.check_point || "",
         observation: evidence,
-        correctionRequired: dataChecklistCorrectionRequired(row.check_point, evidence)
+        correctionRequired: dataChecklistCorrectionRequired(row.check_point, evidence),
+        matrixStates
       });
     }
   }
@@ -2669,6 +2684,12 @@ function reviewSummaryCorrectionObservations(result, findings = []) {
     column.detected_report_name || column.report_name || column.excel_design_file || column.pdf_file || column.key
   ]));
   for (const row of result.design_check_matrix?.rows || []) {
+    const matrixStates = Object.fromEntries(
+      Object.entries(row.statuses || {}).map(([statusKey, status]) => [
+        designReportNameByKey.get(statusKey) || statusKey,
+        status?.display || status?.raw_status || ""
+      ])
+    );
     for (const [statusKey, status] of Object.entries(row.statuses || {})) {
       if (!isMismatchStatus(status?.display || status?.raw_status)) continue;
       const reportName = designReportNameByKey.get(statusKey) || statusKey;
@@ -2684,7 +2705,8 @@ function reviewSummaryCorrectionObservations(result, findings = []) {
         state: status?.display || status?.raw_status || "Not OK",
         checkPoint: row.check_point || "",
         observation: evidence,
-        correctionRequired: "Correct the Excel report design issue or document accepted design evidence before sign-off."
+        correctionRequired: "Correct the Excel report design issue or document accepted design evidence before sign-off.",
+        matrixStates
       });
     }
   }

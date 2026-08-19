@@ -294,6 +294,7 @@ type CorrectionObservation = {
   checkPoint?: string;
   observation?: string;
   correctionRequired?: string;
+  matrixStates?: Record<string, string>;
 };
 
 type CorrectionObservationMatrixRow = {
@@ -1758,7 +1759,7 @@ function CorrectionObservationGroup({
                   <td>{row.sNo || index + 1}</td>
                   <td>{row.checkPoint || "-"}</td>
                   {matrix.reports.map((report) => {
-                    const state = row.reportStates[report] || "";
+                    const state = row.reportStates[report] || "NA";
                     return (
                       <td key={`${row.key}-${report}`}>
                         {state ? (
@@ -1793,7 +1794,11 @@ function CorrectionObservationGroup({
 }
 
 function buildCorrectionObservationMatrix(observations: CorrectionObservation[]) {
-  const reports = uniqueOrderedStrings(observations.map((observation) => observation.report || "").filter(Boolean));
+  const reports = uniqueOrderedStrings(
+    observations
+      .flatMap((observation) => [observation.report || "", ...Object.keys(observation.matrixStates || {})])
+      .filter(Boolean)
+  );
   const rows = new Map<string, CorrectionObservationMatrixRow>();
   observations.forEach((observation, index) => {
     const checkPoint = observation.checkPoint || observation.title || "-";
@@ -1809,12 +1814,29 @@ function buildCorrectionObservationMatrix(observations: CorrectionObservation[])
       });
     }
     const row = rows.get(key)!;
+    Object.entries(observation.matrixStates || {}).forEach(([matrixReport, matrixState]) => {
+      if (!matrixReport || !matrixState) return;
+      if (!reports.includes(matrixReport)) reports.push(matrixReport);
+      row.reportStates[matrixReport] = matrixState;
+    });
     const report = observation.report || "Report";
     if (!reports.includes(report)) reports.push(report);
     row.reportStates[report] = observation.state || observation.severity || "Not OK";
     const evidence = observation.observation || observation.detail || observation.correctionRequired || observation.recommendation || "-";
     row.remarks.push(`${report}: ${evidence}`);
   });
+  const pairReports = reports.filter((report) => /\bvs\b/i.test(report));
+  if (pairReports.length) {
+    rows.forEach((row) => {
+      const rowEvidence = row.remarks.join(" ");
+      const pairState = /cross[-\s]*excel|mismatch detail|pair mismatch|compared common column/i.test(rowEvidence) ? "Not OK" : "NA";
+      pairReports.forEach((report) => {
+        if (!row.reportStates[report]) {
+          row.reportStates[report] = pairState;
+        }
+      });
+    });
+  }
   return { reports, rows: [...rows.values()] };
 }
 
