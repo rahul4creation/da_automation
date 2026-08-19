@@ -1,56 +1,56 @@
 {
   "projectId": "grafana",
-  "projectName": "UPCL",
+  "projectName": "MSEDCL",
   "owner": "Rahul_Raj",
   "ownerUserName": "Rahul_Raj",
   "createdByUserName": "Rahul_Raj",
   "targetPlatform": "Grafana",
   "status": "active",
   "currentPhaseId": "01-requirement-intake",
-  "createdAt": "2026-07-23T13:53:15.922Z",
-  "updatedAt": "2026-07-23T13:53:15.922Z",
+  "createdAt": "2026-08-18T07:26:55.251Z",
+  "updatedAt": "2026-08-18T07:26:55.251Z",
   "phases": {
     "01-requirement-intake": {
       "status": "in-progress",
       "gateRecommendation": "TBD",
       "lastArtifact": "",
-      "updatedAt": "2026-07-23T13:53:15.922Z"
+      "updatedAt": "2026-08-18T07:26:55.251Z"
     },
     "02-ai-analysis-understanding": {
       "status": "not-started",
       "gateRecommendation": "TBD",
       "lastArtifact": "",
-      "updatedAt": "2026-07-23T13:53:15.922Z"
+      "updatedAt": "2026-08-18T07:26:55.251Z"
     },
     "03-sql-draft-logic-preparation": {
       "status": "not-started",
       "gateRecommendation": "TBD",
       "lastArtifact": "",
-      "updatedAt": "2026-07-23T13:53:15.922Z"
+      "updatedAt": "2026-08-18T07:26:55.251Z"
     },
     "04-dashboard-report-development": {
       "status": "not-started",
       "gateRecommendation": "TBD",
       "lastArtifact": "",
-      "updatedAt": "2026-07-23T13:53:15.922Z"
+      "updatedAt": "2026-08-18T07:26:55.251Z"
     },
     "05-ai-review-validation": {
       "status": "not-started",
       "gateRecommendation": "TBD",
       "lastArtifact": "",
-      "updatedAt": "2026-07-23T13:53:15.922Z"
+      "updatedAt": "2026-08-18T07:26:55.251Z"
     },
     "06-testing-verification": {
       "status": "not-started",
       "gateRecommendation": "TBD",
       "lastArtifact": "",
-      "updatedAt": "2026-07-23T13:53:15.922Z"
+      "updatedAt": "2026-08-18T07:26:55.251Z"
     },
     "07-approval-delivery": {
       "status": "not-started",
       "gateRecommendation": "TBD",
       "lastArtifact": "",
-      "updatedAt": "2026-07-23T13:53:15.922Z"
+      "updatedAt": "2026-08-18T07:26:55.251Z"
     }
   }
 }

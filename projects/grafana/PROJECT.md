@@ -1,4 +1,4 @@
-# Project: UPCL
+# Project: MSEDCL
 
 - Project ID: grafana
 - Status: active
@@ -8,8 +8,8 @@
 - Technical owner:
 - Support owner:
 - Target platform: Grafana
-- Created date: 2026-07-23T13:53:15.922Z
-- Last updated: 2026-07-23T13:53:15.922Z
+- Created date: 2026-08-18T07:26:55.251Z
+- Last updated: 2026-08-18T07:26:55.251Z
 
 ## Scope
 

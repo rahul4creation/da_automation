@@ -95,6 +95,44 @@ function Resolve-DefaultProjectWorkspaceRoot {
     return (Join-Path $RepoRoot "DA AUTOMATION UI LIVE DUPLICATE\projects-live-copy")
 }
 
+function Resolve-DefaultProjectWorkspaceRoots {
+    $roots = New-Object System.Collections.Generic.List[string]
+
+    $primaryEnvPath = Join-Path $RepoRoot "DA AUTOMATION UI\.env"
+    $primaryConfiguredRoot = Get-EnvFileValue -Path $primaryEnvPath -Name "DA_PROJECTS_ROOT"
+    if ($primaryConfiguredRoot) {
+        $roots.Add($primaryConfiguredRoot)
+    } else {
+        $roots.Add((Join-Path $RepoRoot "DA AUTOMATION UI\projects"))
+    }
+
+    $duplicateRoot = Resolve-DefaultProjectWorkspaceRoot
+    if ($duplicateRoot) {
+        $roots.Add($duplicateRoot)
+    }
+
+    $uniqueRoots = New-Object System.Collections.Generic.List[string]
+    foreach ($root in $roots) {
+        if (-not $root) {
+            continue
+        }
+
+        $alreadyAdded = $false
+        foreach ($existingRoot in $uniqueRoots) {
+            if ($existingRoot.Equals($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $alreadyAdded = $true
+                break
+            }
+        }
+
+        if (-not $alreadyAdded) {
+            $uniqueRoots.Add($root)
+        }
+    }
+
+    return $uniqueRoots.ToArray()
+}
+
 function Test-SameFileContent {
     param(
         [string]$SourcePath,
@@ -170,6 +208,7 @@ function Sync-ProjectWorkspace {
     $copiedCount = 0
     $unchangedCount = 0
     $skippedCount = 0
+    $staleSkippedCount = 0
     Get-ChildItem -LiteralPath $sourceResolved -Recurse -Force -File | ForEach-Object {
         $relativePath = $_.FullName.Substring($sourceResolved.Length).TrimStart('\', '/')
         if (-not (Test-ProjectMirrorFileAllowed -RelativePath $relativePath)) {
@@ -188,11 +227,19 @@ function Sync-ProjectWorkspace {
             return
         }
 
+        if (Test-Path -LiteralPath $destinationPath) {
+            $destinationItem = Get-Item -LiteralPath $destinationPath
+            if ($_.LastWriteTime -lt $destinationItem.LastWriteTime) {
+                $staleSkippedCount += 1
+                return
+            }
+        }
+
         Copy-Item -LiteralPath $_.FullName -Destination $destinationPath -Force
         $copiedCount += 1
     }
 
-    Write-Log "Project mirror complete from '$sourceResolved' to '$destinationResolved'. Copied/updated: $copiedCount. Unchanged: $unchangedCount. Skipped: $skippedCount."
+    Write-Log "Project mirror complete from '$sourceResolved' to '$destinationResolved'. Copied/updated: $copiedCount. Unchanged: $unchangedCount. Skipped: $skippedCount. Older conflicting files skipped: $staleSkippedCount."
 }
 
 $lockStream = $null
@@ -237,13 +284,16 @@ try {
     }
 
     if (-not $NoProjectMirror) {
-        if (-not $ProjectWorkspaceRoot) {
-            $ProjectWorkspaceRoot = Resolve-DefaultProjectWorkspaceRoot
-        }
         if (-not $TrackedProjectsRoot) {
             $TrackedProjectsRoot = Join-Path $RepoRoot "projects"
         }
-        Sync-ProjectWorkspace -SourceRoot $ProjectWorkspaceRoot -DestinationRoot $TrackedProjectsRoot
+        if ($ProjectWorkspaceRoot) {
+            Sync-ProjectWorkspace -SourceRoot $ProjectWorkspaceRoot -DestinationRoot $TrackedProjectsRoot
+        } else {
+            foreach ($workspaceRoot in (Resolve-DefaultProjectWorkspaceRoots)) {
+                Sync-ProjectWorkspace -SourceRoot $workspaceRoot -DestinationRoot $TrackedProjectsRoot
+            }
+        }
     } else {
         Write-Log "Project mirror skipped because -NoProjectMirror was provided."
     }
