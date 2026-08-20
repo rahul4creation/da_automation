@@ -1,0 +1,56 @@
+{
+  "projectId": "new",
+  "projectName": "MSEDCL",
+  "owner": "Rahul_Raj",
+  "ownerUserName": "Rahul_Raj",
+  "createdByUserName": "Rahul_Raj",
+  "targetPlatform": "Grafana",
+  "status": "active",
+  "currentPhaseId": "01-requirement-intake",
+  "createdAt": "2026-08-20T10:46:17.070Z",
+  "updatedAt": "2026-08-20T10:46:17.070Z",
+  "phases": {
+    "01-requirement-intake": {
+      "status": "in-progress",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-08-20T10:46:17.070Z"
+    },
+    "02-ai-analysis-understanding": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-08-20T10:46:17.070Z"
+    },
+    "03-sql-draft-logic-preparation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-08-20T10:46:17.070Z"
+    },
+    "04-dashboard-report-development": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-08-20T10:46:17.070Z"
+    },
+    "05-ai-review-validation": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-08-20T10:46:17.070Z"
+    },
+    "06-testing-verification": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-08-20T10:46:17.070Z"
+    },
+    "07-approval-delivery": {
+      "status": "not-started",
+      "gateRecommendation": "TBD",
+      "lastArtifact": "",
+      "updatedAt": "2026-08-20T10:46:17.070Z"
+    }
+  }
+}

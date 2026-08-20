@@ -1445,6 +1445,7 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
     timeTo: "now",
     reviewTimestamp: formatDateTime(new Date())
   }));
+  const [autoTimestamp, setAutoTimestamp] = useState(true);
   const [runStatus, setRunStatus] = useState("Sample loaded for flow preview. Run a live review to query Grafana and create fresh saved artifacts.");
   const [running, setRunning] = useState(false);
 
@@ -1452,11 +1453,22 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
   const effectiveBaseUrl = normalizeBaseUrl(form.baseUrl || parsedMain?.baseUrl || "");
   const readyMessage = dashboardRunReadiness(runMode, form, effectiveBaseUrl);
 
+  useEffect(() => {
+    if (!autoTimestamp || running) return;
+    const syncTimestamp = () => updateForm("reviewTimestamp", formatDateTime(new Date()));
+    syncTimestamp();
+    const timer = window.setInterval(syncTimestamp, 1000);
+    return () => window.clearInterval(timer);
+  }, [autoTimestamp, running]);
+
   function updateForm(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
   function analyzeDashboardSetup() {
+    const latestTimestamp = formatDateTime(new Date());
+    setAutoTimestamp(true);
+    updateForm("reviewTimestamp", latestTimestamp);
     setRunStatus(readyMessage);
   }
 
@@ -1470,6 +1482,9 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
       return;
     }
 
+    const latestTimestamp = formatDateTime(new Date());
+    setAutoTimestamp(true);
+    updateForm("reviewTimestamp", latestTimestamp);
     setRunning(true);
     setRunStatus(`Running ${dashboardModeLabel(runMode).toLowerCase()} through the local dashboard review backend.`);
     try {
@@ -1485,7 +1500,7 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
           navigationUrl: form.navigationUrl.trim(),
           timeFrom: form.timeFrom.trim() || "now-1h",
           timeTo: form.timeTo.trim() || "now",
-          reviewTimestamp: form.reviewTimestamp.trim()
+          reviewTimestamp: latestTimestamp
         })
       });
       const payload = await response.json().catch(() => ({}));
@@ -1544,14 +1559,20 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
             <span>Review timestamp</span>
             <div className="dashboard-inline-field">
               <input
-                onChange={(event) => updateForm("reviewTimestamp", event.target.value)}
+                onChange={(event) => {
+                  setAutoTimestamp(false);
+                  updateForm("reviewTimestamp", event.target.value);
+                }}
                 placeholder="DD-MM-YYYY HH:MM:SS"
                 type="text"
                 value={form.reviewTimestamp}
               />
               <button
                 className="secondary-btn dashboard-now-btn"
-                onClick={() => updateForm("reviewTimestamp", formatDateTime(new Date()))}
+                onClick={() => {
+                  setAutoTimestamp(true);
+                  updateForm("reviewTimestamp", formatDateTime(new Date()));
+                }}
                 type="button"
               >
                 <RefreshCw size={15} />
