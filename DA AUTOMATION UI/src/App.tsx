@@ -5,6 +5,8 @@ import {
   ChevronDown,
   CheckCircle2,
   Circle,
+  Download,
+  Eye,
   FileText,
   FolderPlus,
   LogOut,
@@ -39,6 +41,7 @@ const authUsernameKey = "da-review-ai-ui-username";
 const authUserTypeKey = "da-review-ai-ui-user-type";
 const lastUsernameKey = "da-review-ai-ui-last-username";
 const defaultReviewPhaseId = "05-ai-review-validation";
+const dashboardReviewClientTimeoutMs = 10 * 60 * 1000;
 
 type CreateUserInput = {
   adminUsername: string;
@@ -60,6 +63,17 @@ type LoginResult = {
 };
 
 type DashboardRunMode = "linked" | "fixed" | "single";
+
+type DashboardArtifact = {
+  path: string;
+  name: string;
+  displayName?: string;
+  extension?: string;
+  artifactType?: string;
+  size?: number;
+  modifiedAt?: string;
+  canView?: boolean;
+};
 
 type Toast = { type: "success" | "error" | "info"; message: string } | null;
 type PhaseQuestion = {
@@ -1447,8 +1461,13 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
   }));
   const [autoTimestamp, setAutoTimestamp] = useState(true);
   const [runStatus, setRunStatus] = useState("Sample loaded for flow preview. Run a live review to query Grafana and create fresh saved artifacts.");
+  const [dashboardArtifacts, setDashboardArtifacts] = useState<DashboardArtifact[]>([]);
+  const [artifactFolder, setArtifactFolder] = useState("");
+  const [artifactStatus, setArtifactStatus] = useState("Run a live review to generate dashboard review PDF files.");
+  const [artifactLoading, setArtifactLoading] = useState(false);
   const [running, setRunning] = useState(false);
 
+  const reviewApiBase = useMemo(() => `${window.location.protocol}//${window.location.hostname}:8000`, []);
   const parsedMain = useMemo(() => parseDashboardSetupUrl(form.mainUrl, form.baseUrl), [form.mainUrl, form.baseUrl]);
   const effectiveBaseUrl = normalizeBaseUrl(form.baseUrl || parsedMain?.baseUrl || "");
   const readyMessage = dashboardRunReadiness(runMode, form, effectiveBaseUrl);
@@ -1461,6 +1480,10 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
     return () => window.clearInterval(timer);
   }, [autoTimestamp, running]);
 
+  useEffect(() => {
+    void loadDashboardArtifacts("");
+  }, []);
+
   function updateForm(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
   }
@@ -1470,6 +1493,29 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
     setAutoTimestamp(true);
     updateForm("reviewTimestamp", latestTimestamp);
     setRunStatus(readyMessage);
+  }
+
+  async function loadDashboardArtifacts(folder = artifactFolder) {
+    setArtifactLoading(true);
+    setArtifactStatus("Refreshing dashboard review PDF files.");
+    try {
+      const endpoint = new URL(`${reviewApiBase}/api/review-artifacts`);
+      if (folder) endpoint.searchParams.set("folder", folder);
+      const response = await fetch(endpoint.toString());
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Artifact refresh failed with HTTP ${response.status}.`);
+      }
+      const files = Array.isArray(payload.files) ? payload.files.filter((file: DashboardArtifact) => file.extension === ".pdf") : [];
+      setDashboardArtifacts(files);
+      setArtifactFolder(payload.folder || folder || "");
+      setArtifactStatus(files.length ? `${files.length} dashboard review PDF file(s) ready.` : "No dashboard review PDF files found.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setArtifactStatus(`PDF refresh failed: ${message}`);
+    } finally {
+      setArtifactLoading(false);
+    }
   }
 
   async function runDashboardReview() {
@@ -1487,11 +1533,22 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
     updateForm("reviewTimestamp", latestTimestamp);
     setRunning(true);
     setRunStatus(`Running ${dashboardModeLabel(runMode).toLowerCase()} through the local dashboard review backend.`);
+    const controller = new AbortController();
+    const slowStatusTimer = window.setTimeout(() => {
+      setRunStatus(
+        `Still running ${dashboardModeLabel(runMode).toLowerCase()}. This Grafana validation can take around 5 minutes because it queries multiple linked dashboards.`
+      );
+    }, 60000);
+    const verySlowStatusTimer = window.setTimeout(() => {
+      setRunStatus("Still running. Keep this page open; fresh PDF artifacts will appear when the backend finishes.");
+      void loadDashboardArtifacts(artifactFolder);
+    }, 180000);
+    const timeoutTimer = window.setTimeout(() => controller.abort(), dashboardReviewClientTimeoutMs);
     try {
-      const reviewApiBase = `${window.location.protocol}//${window.location.hostname}:8000`;
       const response = await fetch(`${reviewApiBase}/api/run-review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           mode: runMode,
           baseUrl: effectiveBaseUrl,
@@ -1508,11 +1565,26 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
         throw new Error(payload.error || `Dashboard review failed with HTTP ${response.status}.`);
       }
       const savedFolder = payload.paths?.folder ? ` Fresh artifacts were saved under ${payload.paths.folder}.` : "";
+      const generatedPdfs = dashboardArtifactsFromPaths(payload.paths);
+      if (generatedPdfs.length) {
+        setDashboardArtifacts(generatedPdfs);
+        setArtifactFolder(payload.paths?.folder || "");
+        setArtifactStatus(`${generatedPdfs.length} dashboard review PDF file(s) ready.`);
+      }
+      void loadDashboardArtifacts(payload.paths?.folder || "");
       setRunStatus(`Live dashboard review completed.${savedFolder}`);
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        setRunStatus("Live review is taking longer than 10 minutes, so the browser stopped waiting. The backend may still finish; use Refresh PDFs to check for completed artifacts.");
+        void loadDashboardArtifacts(artifactFolder);
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       setRunStatus(`Live review failed: ${message || "Start the dashboard reviewer with python review_server.py, then try again."}`);
     } finally {
+      window.clearTimeout(slowStatusTimer);
+      window.clearTimeout(verySlowStatusTimer);
+      window.clearTimeout(timeoutTimer);
       setRunning(false);
     }
   }
@@ -1653,9 +1725,86 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
           </div>
           <span className="dashboard-run-status">{runStatus}</span>
         </div>
+
+        <div className="dashboard-artifact-panel">
+          <div className="dashboard-artifact-head">
+            <div>
+              <span className="eyebrow">Review PDFs</span>
+              <strong>{artifactFolder || "Dashboard review output"}</strong>
+            </div>
+            <button className="secondary-btn" disabled={artifactLoading} onClick={() => void loadDashboardArtifacts()} type="button">
+              {artifactLoading ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
+              Refresh PDFs
+            </button>
+          </div>
+          {dashboardArtifacts.length ? (
+            <div className="repository-file-list dashboard-artifact-list">
+              {dashboardArtifacts.map((file) => (
+                <div className="repository-file-row" key={file.path}>
+                  <FileText size={17} />
+                  <span>
+                    {file.displayName || file.name}
+                    <small>
+                      {file.artifactType || "Dashboard review PDF"} | {formatBytes(file.size || 0)}
+                      {file.modifiedAt ? ` | ${formatOptionalDateTime(file.modifiedAt)}` : ""}
+                    </small>
+                  </span>
+                  <div className="repository-actions">
+                    <a
+                      className="icon-action"
+                      href={dashboardReviewArtifactUrl(file.path)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`View ${file.displayName || file.name}`}
+                    >
+                      <Eye size={15} />
+                    </a>
+                    <a className="icon-action" href={dashboardReviewArtifactUrl(file.path, true)} title={`Download ${file.displayName || file.name}`}>
+                      <Download size={15} />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-note">{artifactStatus}</div>
+          )}
+        </div>
       </div>
     </section>
   );
+}
+
+function dashboardArtifactsFromPaths(paths: unknown): DashboardArtifact[] {
+  if (!paths || typeof paths !== "object") return [];
+  const seen = new Set<string>();
+  return Object.values(paths as Record<string, unknown>)
+    .filter((value): value is string => typeof value === "string" && value.toLowerCase().endsWith(".pdf"))
+    .filter((pathValue) => {
+      if (seen.has(pathValue)) return false;
+      seen.add(pathValue);
+      return true;
+    })
+    .map((pathValue) => ({
+      path: pathValue,
+      name: fileNameFromPath(pathValue),
+      displayName: fileNameFromPath(pathValue),
+      extension: ".pdf",
+      artifactType: "Dashboard review PDF",
+      size: 0,
+      canView: true
+    }));
+}
+
+function dashboardReviewArtifactUrl(pathValue: string, download = false) {
+  const endpoint = new URL(`${window.location.protocol}//${window.location.hostname}:8000/api/review-artifact`);
+  endpoint.searchParams.set("path", pathValue);
+  if (download) endpoint.searchParams.set("download", "1");
+  return endpoint.toString();
+}
+
+function fileNameFromPath(pathValue: string) {
+  return pathValue.split(/[\\/]/).pop() || pathValue || "dashboard-review.pdf";
 }
 
 function dashboardModeLabel(mode: DashboardRunMode) {
@@ -2031,4 +2180,10 @@ function formatBytes(value: number) {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatOptionalDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatDateTime(date);
 }
