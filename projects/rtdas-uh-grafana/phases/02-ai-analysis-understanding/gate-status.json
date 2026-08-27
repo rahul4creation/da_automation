@@ -1,0 +1,169 @@
+{
+  "projectContext": [
+    {
+      "item": "Project ID",
+      "requiredCondition": "Stable project_id is known and uses lowercase letters, digits, hyphens, and underscores.",
+      "status": "Complete",
+      "evidence": "rtdas-uh-grafana",
+      "owner": "Divyansh",
+      "notes": ""
+    },
+    {
+      "item": "Project workspace",
+      "requiredCondition": "Project artifact root exists or will be created under projects/<project_id>/.",
+      "status": "Complete",
+      "evidence": "projects/rtdas-uh-grafana",
+      "owner": "Divyansh",
+      "notes": ""
+    },
+    {
+      "item": "Project control file",
+      "requiredCondition": "PROJECT.md exists or will be created for the project.",
+      "status": "Complete",
+      "evidence": "projects/rtdas-uh-grafana/PROJECT.md",
+      "owner": "Divyansh",
+      "notes": ""
+    },
+    {
+      "item": "Current phase",
+      "requiredCondition": "Active phase is known.",
+      "status": "Complete",
+      "evidence": "01-requirement-intake",
+      "owner": "Divyansh",
+      "notes": ""
+    },
+    {
+      "item": "Artifact path",
+      "requiredCondition": "Output location for the current artifact is known.",
+      "status": "Complete",
+      "evidence": "projects/rtdas-uh-grafana/phases/02-ai-analysis-understanding/source-to-report-mapping.md",
+      "owner": "Divyansh",
+      "notes": ""
+    },
+    {
+      "item": "Project owner",
+      "requiredCondition": "Business owner, requester, or proxy owner is known.",
+      "status": "Complete",
+      "evidence": "Divyansh",
+      "owner": "Divyansh",
+      "notes": ""
+    },
+    {
+      "item": "Cross-project scope",
+      "requiredCondition": "If multiple projects are affected, each project_id is listed.",
+      "status": "Not applicable",
+      "evidence": "Single project workspace.",
+      "owner": "Divyansh",
+      "notes": "No cross-project scope declared."
+    }
+  ],
+  "entry": [
+    {
+      "item": "Project context ready",
+      "requiredCondition": "Project Context Gate is complete for the same project_id as Phase 1.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Requirement brief",
+      "requiredCondition": "Phase 1 requirement brief is available and approved or marked with accepted risks.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "KPI catalog",
+      "requiredCondition": "KPI definitions or unresolved KPI questions are available.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Data access path",
+      "requiredCondition": "Schema, DDL, sample rows, data dictionary, existing SQL, or owner path is available.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Acceptance criteria",
+      "requiredCondition": "Testable criteria are available to guide mapping and validation.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "exit": [
+    {
+      "item": "Source-to-report mapping",
+      "requiredCondition": "Every KPI, dimension, filter, and output field is mapped, questioned, or rejected as unavailable.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Grain defined",
+      "requiredCondition": "Reporting grain and source grain are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Join model",
+      "requiredCondition": "Join paths, keys, cardinality, and duplicate risks are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Date logic",
+      "requiredCondition": "Source date fields, timezone, and refresh implications are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Transformations",
+      "requiredCondition": "Calculations, exclusions, status logic, conversions, and null handling are documented.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Data quality risks",
+      "requiredCondition": "Missing data, ambiguity, nulls, duplicates, late data, and performance risks are logged.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Validation plan",
+      "requiredCondition": "Validation checks needed for SQL and testing are listed.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    },
+    {
+      "item": "Owner assignments",
+      "requiredCondition": "Blocking data questions have owners and next actions.",
+      "status": "Incomplete",
+      "evidence": "",
+      "owner": "",
+      "notes": ""
+    }
+  ],
+  "updatedAt": "2026-08-27T10:10:53.461Z"
+}

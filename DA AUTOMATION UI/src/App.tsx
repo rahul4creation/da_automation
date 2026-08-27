@@ -2,9 +2,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  CalendarDays,
   ChevronDown,
   CheckCircle2,
   Circle,
+  Clock,
   Download,
   Eye,
   FileText,
@@ -14,6 +16,7 @@ import {
   Play,
   RefreshCw,
   Save,
+  Search,
   ShieldCheck,
   Upload,
   UserPlus,
@@ -42,6 +45,8 @@ const authUserTypeKey = "da-review-ai-ui-user-type";
 const lastUsernameKey = "da-review-ai-ui-last-username";
 const defaultReviewPhaseId = "05-ai-review-validation";
 const dashboardReviewClientTimeoutMs = 10 * 60 * 1000;
+const dashboardReviewApiPort = "8006";
+const defaultDashboardChecklistPath = "C:\\Users\\Dell_PC\\Downloads\\COMMON CHECK LIST (1).xlsx";
 
 type CreateUserInput = {
   adminUsername: string;
@@ -74,6 +79,32 @@ type DashboardArtifact = {
   modifiedAt?: string;
   canView?: boolean;
 };
+
+type DashboardChecklistOption = {
+  label: string;
+  path: string;
+  exists?: boolean;
+  isDefault?: boolean;
+};
+
+const fallbackDashboardChecklistOptions: DashboardChecklistOption[] = [
+  {
+    label: "COMMON CHECK LIST (1).xlsx",
+    path: defaultDashboardChecklistPath,
+    exists: true,
+    isDefault: true
+  },
+  {
+    label: "Project COMMON CHECK LIST.xlsx",
+    path: "D:\\AIReview\\report-review-input\\excel-pdf-data\\checklist\\COMMON CHECK LIST.xlsx",
+    exists: true
+  },
+  {
+    label: "Embedded dashboard checklist fallback",
+    path: "",
+    exists: true
+  }
+];
 
 type Toast = { type: "success" | "error" | "info"; message: string } | null;
 type PhaseQuestion = {
@@ -798,7 +829,7 @@ export default function App() {
               <PhaseHeader phase={activePhase} project={project} />
               {activePhase.id === defaultReviewPhaseId ? (
                 isGrafanaPlatform(project.targetPlatform) ? (
-                  <DashboardReviewPlaceholder project={project} />
+                  <DashboardReviewPlaceholder project={project} username={currentUsername} />
                 ) : (
                   <ExcelPdfReviewApp
                     embedded
@@ -1447,7 +1478,7 @@ function ReviewAgentInfo({ project }: { project: ProjectDetail }) {
   );
 }
 
-function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
+function DashboardReviewPlaceholder({ project, username }: { project: ProjectDetail; username: string }) {
   const [runMode, setRunMode] = useState<DashboardRunMode>("linked");
   const [form, setForm] = useState(() => ({
     baseUrl: "https://msedclgrafana.amnex.co.in:3000",
@@ -1455,6 +1486,7 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
       "https://msedclgrafana.amnex.co.in:3000/d/ad7931a0-0649-456f-9601-b5f7a14491b8/substation-health-monitor?orgId=1&refresh=5m",
     validationUrl: "",
     navigationUrl: "",
+    checklistPath: defaultDashboardChecklistPath,
     timeFrom: "now-1h",
     timeTo: "now",
     reviewTimestamp: formatDateTime(new Date())
@@ -1465,9 +1497,13 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
   const [artifactFolder, setArtifactFolder] = useState("");
   const [artifactStatus, setArtifactStatus] = useState("Run a live review to generate dashboard review PDF files.");
   const [artifactLoading, setArtifactLoading] = useState(false);
+  const [checklistOptions, setChecklistOptions] = useState<DashboardChecklistOption[]>(fallbackDashboardChecklistOptions);
+  const [checklistStatus, setChecklistStatus] = useState("Using the shared dashboard checklist by default.");
+  const [checklistUploading, setChecklistUploading] = useState(false);
   const [running, setRunning] = useState(false);
+  const checklistFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const reviewApiBase = useMemo(() => `${window.location.protocol}//${window.location.hostname}:8000`, []);
+  const reviewApiBase = useMemo(() => `${window.location.protocol}//${window.location.hostname}:${dashboardReviewApiPort}`, []);
   const parsedMain = useMemo(() => parseDashboardSetupUrl(form.mainUrl, form.baseUrl), [form.mainUrl, form.baseUrl]);
   const effectiveBaseUrl = normalizeBaseUrl(form.baseUrl || parsedMain?.baseUrl || "");
   const readyMessage = dashboardRunReadiness(runMode, form, effectiveBaseUrl);
@@ -1481,6 +1517,7 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
   }, [autoTimestamp, running]);
 
   useEffect(() => {
+    void loadDashboardChecklists();
     void loadDashboardArtifacts("");
   }, []);
 
@@ -1495,12 +1532,75 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
     setRunStatus(readyMessage);
   }
 
+  async function loadDashboardChecklists() {
+    try {
+      const endpoint = new URL(`${reviewApiBase}/api/dashboard-checklists`);
+      endpoint.searchParams.set("selected", form.checklistPath);
+      const response = await fetch(endpoint.toString());
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || !Array.isArray(payload.checklists)) {
+        throw new Error(payload.error || `Checklist refresh failed with HTTP ${response.status}.`);
+      }
+      const options = payload.checklists as DashboardChecklistOption[];
+      setChecklistOptions(options);
+      const activeOption = options.find((option) => option.path === form.checklistPath);
+      const defaultOption = options.find((option) => option.isDefault && option.exists !== false);
+      if (!activeOption && defaultOption) {
+        updateForm("checklistPath", defaultOption.path);
+      }
+      const selected = activeOption || defaultOption || options[0];
+      setChecklistStatus(
+        selected
+          ? `Checklist selected: ${selected.label}${selected.exists === false ? " (file not found, fallback will be used)" : ""}.`
+          : "Embedded dashboard checklist fallback will be used."
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setChecklistOptions(fallbackDashboardChecklistOptions);
+      setChecklistStatus(`Checklist selector fallback loaded: ${message}`);
+    }
+  }
+
+  async function uploadDashboardChecklist(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      setChecklistStatus("Please select an .xlsx checklist file.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    setChecklistUploading(true);
+    setChecklistStatus(`Uploading ${file.name}.`);
+    try {
+      const response = await fetch(`${reviewApiBase}/api/dashboard-checklists/upload`, {
+        method: "POST",
+        body: formData
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || !payload.checklist?.path) {
+        throw new Error(payload.error || `Checklist upload failed with HTTP ${response.status}.`);
+      }
+      const options = Array.isArray(payload.checklists) ? (payload.checklists as DashboardChecklistOption[]) : [payload.checklist];
+      setChecklistOptions(options);
+      updateForm("checklistPath", payload.checklist.path);
+      setChecklistStatus(`Checklist uploaded and selected: ${payload.checklist.label}${payload.pointCount ? ` (${payload.pointCount} points)` : ""}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setChecklistStatus(`Checklist upload failed: ${message}`);
+    } finally {
+      setChecklistUploading(false);
+    }
+  }
+
   async function loadDashboardArtifacts(folder = artifactFolder) {
     setArtifactLoading(true);
     setArtifactStatus("Refreshing dashboard review PDF files.");
     try {
       const endpoint = new URL(`${reviewApiBase}/api/review-artifacts`);
       if (folder) endpoint.searchParams.set("folder", folder);
+      endpoint.searchParams.set("actorUserName", username);
       const response = await fetch(endpoint.toString());
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) {
@@ -1555,6 +1655,8 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
           mainUrl: form.mainUrl.trim(),
           validationUrl: form.validationUrl.trim(),
           navigationUrl: form.navigationUrl.trim(),
+          checklistPath: form.checklistPath.trim(),
+          actorUserName: username,
           timeFrom: form.timeFrom.trim() || "now-1h",
           timeTo: form.timeTo.trim() || "now",
           reviewTimestamp: latestTimestamp
@@ -1683,14 +1785,58 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
               />
             </label>
           )}
-          <label className="dashboard-field">
-            <span>Time from</span>
-            <input onChange={(event) => updateForm("timeFrom", event.target.value)} type="text" value={form.timeFrom} />
+          <label className="dashboard-field dashboard-field-wide">
+            <span>Checklist</span>
+            <div className="dashboard-checklist-picker">
+              <select
+                onChange={(event) => {
+                  const selectedPath = event.target.value;
+                  const selected = checklistOptions.find((option) => option.path === selectedPath);
+                  updateForm("checklistPath", selectedPath);
+                  setChecklistStatus(
+                    selected
+                      ? `Checklist selected: ${selected.label}${selected.exists === false ? " (file not found, fallback will be used)" : ""}.`
+                      : "Embedded dashboard checklist fallback will be used."
+                  );
+                }}
+                value={form.checklistPath}
+              >
+                {checklistOptions.map((option) => (
+                  <option key={`${option.path || "embedded"}-${option.label}`} value={option.path}>
+                    {option.label}
+                    {option.isDefault ? " (default)" : ""}
+                    {option.exists === false ? " (missing)" : ""}
+                  </option>
+                ))}
+              </select>
+              <input
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="hidden-input"
+                onChange={(event) => {
+                  void uploadDashboardChecklist(event.target.files);
+                  event.target.value = "";
+                }}
+                ref={checklistFileInputRef}
+                type="file"
+              />
+              <button
+                className="secondary-btn dashboard-browse-btn"
+                disabled={checklistUploading || running}
+                onClick={() => checklistFileInputRef.current?.click()}
+                type="button"
+              >
+                {checklistUploading ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}
+                Browse
+              </button>
+            </div>
+            <small>{checklistStatus}</small>
           </label>
-          <label className="dashboard-field">
-            <span>Time to</span>
-            <input onChange={(event) => updateForm("timeTo", event.target.value)} type="text" value={form.timeTo} />
-          </label>
+          <DashboardTimeRangePicker
+            onTimeFromChange={(value) => updateForm("timeFrom", value)}
+            onTimeToChange={(value) => updateForm("timeTo", value)}
+            timeFrom={form.timeFrom}
+            timeTo={form.timeTo}
+          />
         </div>
 
         <div className="dashboard-context-strip">
@@ -1718,7 +1864,7 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
               {running ? <Loader2 className="spin" size={16} /> : <Play size={16} />}
               {running ? "Running review..." : "Run live review"}
             </button>
-            <button className="secondary-btn" onClick={() => window.open(`${window.location.protocol}//${window.location.hostname}:8000/index.html`, "_blank", "noopener")} type="button">
+            <button className="secondary-btn" onClick={() => window.open(`${window.location.protocol}//${window.location.hostname}:${dashboardReviewApiPort}/index.html`, "_blank", "noopener")} type="button">
               <ArrowRight size={16} />
               Open reviewer
             </button>
@@ -1752,14 +1898,14 @@ function DashboardReviewPlaceholder({ project }: { project: ProjectDetail }) {
                   <div className="repository-actions">
                     <a
                       className="icon-action"
-                      href={dashboardReviewArtifactUrl(file.path)}
+                      href={dashboardReviewArtifactUrl(file.path, false, username)}
                       target="_blank"
                       rel="noreferrer"
                       title={`View ${file.displayName || file.name}`}
                     >
                       <Eye size={15} />
                     </a>
-                    <a className="icon-action" href={dashboardReviewArtifactUrl(file.path, true)} title={`Download ${file.displayName || file.name}`}>
+                    <a className="icon-action" href={dashboardReviewArtifactUrl(file.path, true, username)} title={`Download ${file.displayName || file.name}`}>
                       <Download size={15} />
                     </a>
                   </div>
@@ -1796,9 +1942,10 @@ function dashboardArtifactsFromPaths(paths: unknown): DashboardArtifact[] {
     }));
 }
 
-function dashboardReviewArtifactUrl(pathValue: string, download = false) {
-  const endpoint = new URL(`${window.location.protocol}//${window.location.hostname}:8000/api/review-artifact`);
+function dashboardReviewArtifactUrl(pathValue: string, download = false, username = "") {
+  const endpoint = new URL(`${window.location.protocol}//${window.location.hostname}:${dashboardReviewApiPort}/api/review-artifact`);
   endpoint.searchParams.set("path", pathValue);
+  if (username) endpoint.searchParams.set("actorUserName", username);
   if (download) endpoint.searchParams.set("download", "1");
   return endpoint.toString();
 }
@@ -2167,6 +2314,336 @@ function normalizeBaseUrl(value: string) {
 
 function ensureTrailingSlash(value: string) {
   return value.endsWith("/") ? value : `${value}/`;
+}
+
+const dashboardQuickRanges = [
+  { label: "Last 5 minutes", from: "now-5m", to: "now" },
+  { label: "Last 15 minutes", from: "now-15m", to: "now" },
+  { label: "Last 30 minutes", from: "now-30m", to: "now" },
+  { label: "Last 1 hour", from: "now-1h", to: "now" },
+  { label: "Last 3 hours", from: "now-3h", to: "now" },
+  { label: "Last 6 hours", from: "now-6h", to: "now" },
+  { label: "Last 12 hours", from: "now-12h", to: "now" },
+  { label: "Last 24 hours", from: "now-24h", to: "now" },
+  { label: "Last 2 days", from: "now-2d", to: "now" }
+];
+
+const dashboardRecentRanges = [
+  { label: "2026-07-26 00:00:00 to 2026-07-27 23:59:59", from: "26-07-2026 00:00:00", to: "27-07-2026 23:59:59" },
+  { label: "2026-07-27 00:00:00 to 2026-07-27 23:59:59", from: "27-07-2026 00:00:00", to: "27-07-2026 23:59:59" },
+  { label: "2026-07-26 00:00:00 to 2026-07-26 23:59:59", from: "26-07-2026 00:00:00", to: "26-07-2026 23:59:59" }
+];
+
+function DashboardTimeRangePicker({
+  onTimeFromChange,
+  onTimeToChange,
+  timeFrom,
+  timeTo
+}: {
+  onTimeFromChange: (value: string) => void;
+  onTimeToChange: (value: string) => void;
+  timeFrom: string;
+  timeTo: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draftFrom, setDraftFrom] = useState(timeFrom);
+  const [draftTo, setDraftTo] = useState(timeTo);
+  const [quickSearch, setQuickSearch] = useState("");
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const filteredQuickRanges = dashboardQuickRanges.filter((range) => range.label.toLowerCase().includes(quickSearch.trim().toLowerCase()));
+  const appliedQuickRange = dashboardQuickRanges.find(
+    (range) => cleanRangeToken(range.from) === cleanRangeToken(timeFrom) && cleanRangeToken(range.to) === cleanRangeToken(timeTo)
+  );
+  const selectedQuickRange = dashboardQuickRanges.find(
+    (range) => cleanRangeToken(range.from) === cleanRangeToken(draftFrom) && cleanRangeToken(range.to) === cleanRangeToken(draftTo)
+  );
+  const timeSelectionLabel = appliedQuickRange?.label || `${timeFrom || "now-1h"} to ${timeTo || "now"}`;
+  const pickerFromValue = toDateTimeLocalInputValue(resolveDashboardTimePickerDate(draftFrom, "from"));
+  const pickerToValue = toDateTimeLocalInputValue(resolveDashboardTimePickerDate(draftTo, "to"));
+  const timeFromValue = toTimeInputValue(resolveDashboardTimePickerDate(draftFrom, "from"));
+  const timeToValue = toTimeInputValue(resolveDashboardTimePickerDate(draftTo, "to"));
+
+  useEffect(() => {
+    if (open) return;
+    setDraftFrom(timeFrom);
+    setDraftTo(timeTo);
+  }, [open, timeFrom, timeTo]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: MouseEvent) {
+      if (pickerRef.current && event.target instanceof Node && !pickerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  function openPicker() {
+    setDraftFrom(timeFrom);
+    setDraftTo(timeTo);
+    setOpen(true);
+  }
+
+  function applyRange(nextFrom = draftFrom, nextTo = draftTo) {
+    onTimeFromChange(nextFrom.trim() || "now-1h");
+    onTimeToChange(nextTo.trim() || "now");
+    setOpen(false);
+  }
+
+  return (
+    <div className="dashboard-time-range-control" ref={pickerRef}>
+      <div className="dashboard-time-range-row">
+        <label className="dashboard-field dashboard-time-selection-field">
+          <span>Time selection</span>
+          <button
+            aria-expanded={open}
+            aria-haspopup="dialog"
+            className="dashboard-time-selection-button"
+            onClick={openPicker}
+            title="Open time range picker"
+            type="button"
+          >
+            <span>{timeSelectionLabel}</span>
+            <CalendarDays size={16} />
+          </button>
+        </label>
+      </div>
+      {open && (
+        <div className="dashboard-grafana-time-popover">
+          <div className="grafana-time-absolute">
+            <strong>Absolute time range</strong>
+            <label>
+              <span>From</span>
+              <div className="grafana-absolute-field">
+                <input onChange={(event) => setDraftFrom(event.target.value)} value={draftFrom} />
+                <div className="grafana-absolute-actions">
+                  <div className="grafana-native-picker">
+                    <button aria-hidden="true" className="icon-btn" tabIndex={-1} type="button">
+                      <CalendarDays size={14} />
+                    </button>
+                    <input
+                      aria-label="Pick from date and time"
+                      onChange={(event) => {
+                        const selectedValue = formatDateTimeFromPicker(event.target.value);
+                        if (selectedValue) setDraftFrom(selectedValue);
+                      }}
+                      step="1"
+                      type="datetime-local"
+                      value={pickerFromValue}
+                    />
+                  </div>
+                  <div className="grafana-native-picker">
+                    <button aria-hidden="true" className="icon-btn" tabIndex={-1} type="button">
+                      <Clock size={14} />
+                    </button>
+                    <input
+                      aria-label="Pick from time"
+                      onChange={(event) => {
+                        const selectedValue = formatDateTimeWithPickedTime(draftFrom, event.target.value, "from");
+                        if (selectedValue) setDraftFrom(selectedValue);
+                      }}
+                      step="1"
+                      type="time"
+                      value={timeFromValue}
+                    />
+                  </div>
+                </div>
+              </div>
+            </label>
+            <label>
+              <span>To</span>
+              <div className="grafana-absolute-field">
+                <input onChange={(event) => setDraftTo(event.target.value)} value={draftTo} />
+                <div className="grafana-absolute-actions">
+                  <div className="grafana-native-picker">
+                    <button aria-hidden="true" className="icon-btn" tabIndex={-1} type="button">
+                      <CalendarDays size={14} />
+                    </button>
+                    <input
+                      aria-label="Pick to date and time"
+                      onChange={(event) => {
+                        const selectedValue = formatDateTimeFromPicker(event.target.value);
+                        if (selectedValue) setDraftTo(selectedValue);
+                      }}
+                      step="1"
+                      type="datetime-local"
+                      value={pickerToValue}
+                    />
+                  </div>
+                  <div className="grafana-native-picker">
+                    <button aria-hidden="true" className="icon-btn" tabIndex={-1} type="button">
+                      <Clock size={14} />
+                    </button>
+                    <input
+                      aria-label="Pick to time"
+                      onChange={(event) => {
+                        const selectedValue = formatDateTimeWithPickedTime(draftTo, event.target.value, "to");
+                        if (selectedValue) setDraftTo(selectedValue);
+                      }}
+                      step="1"
+                      type="time"
+                      value={timeToValue}
+                    />
+                  </div>
+                </div>
+              </div>
+            </label>
+            <button className="grafana-apply-button" onClick={() => applyRange()} type="button">
+              Apply time range
+            </button>
+            <strong className="grafana-section-title">Recently used absolute ranges</strong>
+            <div className="grafana-recent-ranges">
+              {dashboardRecentRanges.map((range) => (
+                <button
+                  key={range.label}
+                  onClick={() => {
+                    setDraftFrom(range.from);
+                    setDraftTo(range.to);
+                  }}
+                  type="button"
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
+            <div className="grafana-time-footer">
+              <span>Browser Time IST</span>
+              <span>UTC+05:30</span>
+              <button type="button">Change time settings</button>
+            </div>
+          </div>
+          <div className="grafana-quick-ranges">
+            <label className="grafana-quick-search">
+              <Search size={14} />
+              <input onChange={(event) => setQuickSearch(event.target.value)} placeholder="Search quick ranges" value={quickSearch} />
+            </label>
+            <div className="grafana-quick-list">
+              {filteredQuickRanges.map((range) => (
+                <button
+                  className={selectedQuickRange?.label === range.label ? "active" : ""}
+                  key={range.label}
+                  onClick={() => {
+                    setDraftFrom(range.from);
+                    setDraftTo(range.to);
+                  }}
+                  type="button"
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function cleanRangeToken(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function resolveDashboardTimePickerDate(value: string, variant: "from" | "to") {
+  const parsed = parseDashboardDateTime(value);
+  if (parsed) return parsed;
+
+  const now = new Date();
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "now") return now;
+
+  const relative = normalized.match(/^now\s*([+-])\s*(\d+)\s*([smhdw])$/);
+  if (relative) {
+    const sign = relative[1] === "-" ? -1 : 1;
+    const amount = Number(relative[2]);
+    const unit = relative[3];
+    const unitMs: Record<string, number> = {
+      s: 1000,
+      m: 60 * 1000,
+      h: 60 * 60 * 1000,
+      d: 24 * 60 * 60 * 1000,
+      w: 7 * 24 * 60 * 60 * 1000
+    };
+    return new Date(now.getTime() + sign * amount * unitMs[unit]);
+  }
+
+  return variant === "from" ? new Date(now.getTime() - 60 * 60 * 1000) : now;
+}
+
+function parseDashboardDateTime(value: string) {
+  const text = value.trim();
+  const localMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (localMatch) {
+    return buildLocalDate(
+      Number(localMatch[1]),
+      Number(localMatch[2]),
+      Number(localMatch[3]),
+      Number(localMatch[4]),
+      Number(localMatch[5]),
+      Number(localMatch[6] || 0)
+    );
+  }
+
+  const displayMatch = text.match(/^(\d{2})[-/](\d{2})[-/](\d{4})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!displayMatch) return null;
+  return buildLocalDate(
+    Number(displayMatch[3]),
+    Number(displayMatch[2]),
+    Number(displayMatch[1]),
+    Number(displayMatch[4]),
+    Number(displayMatch[5]),
+    Number(displayMatch[6] || 0)
+  );
+}
+
+function buildLocalDate(year: number, month: number, day: number, hour: number, minute: number, second: number) {
+  const date = new Date(year, month - 1, day, hour, minute, second);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hour ||
+    date.getMinutes() !== minute ||
+    date.getSeconds() !== second
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function toDateTimeLocalInputValue(date: Date | null) {
+  if (!date) return "";
+  const pad = (input: number) => String(input).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+    date.getSeconds()
+  )}`;
+}
+
+function toTimeInputValue(date: Date | null) {
+  if (!date) return "";
+  const pad = (input: number) => String(input).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function formatDateTimeFromPicker(value: string) {
+  const parsed = parseDashboardDateTime(value);
+  return parsed ? formatDateTime(parsed) : "";
+}
+
+function formatDateTimeWithPickedTime(currentValue: string, timeValue: string, variant: "from" | "to") {
+  const match = timeValue.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return "";
+  const date = resolveDashboardTimePickerDate(currentValue, variant);
+  date.setHours(Number(match[1]), Number(match[2]), Number(match[3] || 0), 0);
+  return formatDateTime(date);
 }
 
 function formatDateTime(date: Date) {

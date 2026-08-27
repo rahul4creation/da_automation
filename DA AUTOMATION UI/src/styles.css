@@ -532,7 +532,8 @@ button {
   font-weight: 700;
 }
 
-.dashboard-field input {
+.dashboard-field input,
+.dashboard-field select {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -544,9 +545,36 @@ button {
   outline: none;
 }
 
-.dashboard-field input:focus {
+.dashboard-field select {
+  cursor: pointer;
+}
+
+.dashboard-field input:focus,
+.dashboard-field select:focus {
   border-color: #0b6b8f;
   box-shadow: 0 0 0 3px rgba(11, 107, 143, 0.12);
+}
+
+.dashboard-field small {
+  color: #5a6980;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.dashboard-checklist-picker {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dashboard-checklist-picker select {
+  flex: 1 1 auto;
+}
+
+.dashboard-browse-btn {
+  flex: 0 0 auto;
+  min-height: 44px;
 }
 
 .dashboard-field-wide {
@@ -563,6 +591,285 @@ button {
 
 .dashboard-now-btn {
   flex: 0 0 auto;
+}
+
+.dashboard-time-field {
+  min-width: 0;
+}
+
+.dashboard-time-range-control {
+  position: relative;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.dashboard-time-range-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px 16px;
+  min-width: 0;
+}
+
+.dashboard-time-selection-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 13px;
+  border: 1px solid #c7d0d9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #18212f;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+}
+
+.dashboard-time-selection-button:focus-visible {
+  border-color: #0b6b8f;
+  box-shadow: 0 0 0 3px rgba(11, 107, 143, 0.12);
+  outline: none;
+}
+
+.dashboard-time-selection-button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-time-selection-button svg {
+  flex: 0 0 auto;
+  color: #244862;
+}
+
+.dashboard-calendar-control {
+  position: relative;
+  flex: 0 0 44px;
+  min-height: 44px;
+}
+
+.dashboard-calendar-button {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+.dashboard-calendar-control .dashboard-native-datetime {
+  position: absolute;
+  inset: 0;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dashboard-calendar-control:focus-within .dashboard-calendar-button {
+  border-color: #0b6b8f;
+  box-shadow: 0 0 0 3px rgba(11, 107, 143, 0.12);
+}
+
+.dashboard-grafana-time-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) 206px;
+  width: min(760px, calc(100vw - 320px));
+  min-height: 312px;
+  border: 1px solid #c7d0d9;
+  border-radius: 3px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(24, 33, 47, 0.18);
+  color: #303946;
+}
+
+.grafana-time-absolute,
+.grafana-quick-ranges {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.grafana-time-absolute {
+  padding-bottom: 0;
+}
+
+.grafana-time-absolute > strong,
+.grafana-section-title {
+  color: #303946;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.grafana-time-absolute label {
+  display: grid;
+  gap: 3px;
+  color: #303946;
+  font-size: 12px;
+}
+
+.grafana-absolute-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 182px;
+  min-height: 27px;
+  border: 1px solid #c7d0d9;
+  background: #ffffff;
+}
+
+.grafana-absolute-field:focus-within {
+  border-color: #5794f2;
+  box-shadow: 0 0 0 1px #5794f2;
+}
+
+.grafana-absolute-field input {
+  min-width: 0;
+  height: 25px;
+  padding: 4px 6px;
+  border: 0;
+  color: #303946;
+  outline: none;
+}
+
+.grafana-absolute-actions {
+  display: flex;
+  align-items: stretch;
+  border-left: 1px solid #c7d0d9;
+  background: #f4f5f5;
+}
+
+.grafana-native-picker {
+  position: relative;
+  width: 26px;
+}
+
+.grafana-native-picker .icon-btn {
+  width: 26px;
+  min-height: 25px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #303946;
+}
+
+.grafana-native-picker input {
+  position: absolute;
+  inset: 0;
+  width: 26px;
+  min-height: 25px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.grafana-apply-button {
+  justify-self: start;
+  min-height: 28px;
+  margin-top: 4px;
+  padding: 5px 12px;
+  border: 1px solid #3274d9;
+  border-radius: 2px;
+  background: #3274d9;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.grafana-recent-ranges {
+  display: grid;
+  gap: 5px;
+  max-width: 236px;
+}
+
+.grafana-recent-ranges button,
+.grafana-quick-list button,
+.grafana-time-footer button {
+  border: 0;
+  background: transparent;
+  color: #303946;
+  text-align: left;
+}
+
+.grafana-recent-ranges button {
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.grafana-time-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px -8px 0;
+  padding: 6px 8px;
+  border-top: 1px solid #d8dee6;
+  background: #f4f5f5;
+  color: #303946;
+  font-size: 11px;
+}
+
+.grafana-time-footer span:first-child {
+  margin-right: auto;
+}
+
+.grafana-time-footer span:nth-child(2),
+.grafana-time-footer button {
+  padding: 3px 7px;
+  border: 1px solid #c7d0d9;
+  border-radius: 2px;
+  background: #ffffff;
+  font-size: 11px;
+}
+
+.grafana-quick-ranges {
+  border-left: 1px solid #d8dee6;
+  padding: 6px;
+}
+
+.grafana-quick-search {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 1px solid #5794f2;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px #5794f2;
+  color: #6b7785;
+}
+
+.grafana-quick-search input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  color: #303946;
+  font-size: 12px;
+  outline: none;
+}
+
+.grafana-quick-list {
+  display: grid;
+  gap: 1px;
+}
+
+.grafana-quick-list button {
+  min-height: 27px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.grafana-quick-list button:hover,
+.grafana-quick-list button.active {
+  background: #ebedf0;
 }
 
 .dashboard-context-strip {
@@ -3687,6 +3994,10 @@ button {
 }
 
 @media (max-width: 1180px) {
+  .dashboard-grafana-time-popover {
+    width: min(760px, calc(100vw - 72px));
+  }
+
   .review-main-grid {
     grid-template-columns: 1fr;
   }
@@ -3740,6 +4051,7 @@ button {
   .gate-card,
   .dashboard-context-strip,
   .dashboard-setup-grid,
+  .dashboard-time-range-row,
   .embedded-review-grid .review-stage-list,
   .finding-meaning-grid,
   .step-path,
@@ -3750,6 +4062,30 @@ button {
   .review-metrics,
   .gate-progress-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-checklist-picker {
+    flex-direction: column;
+  }
+
+  .dashboard-grafana-time-popover {
+    position: fixed;
+    top: 72px;
+    right: 12px;
+    left: 12px;
+    grid-template-columns: 1fr;
+    width: auto;
+    max-height: calc(100vh - 96px);
+    overflow: auto;
+  }
+
+  .grafana-quick-ranges {
+    border-top: 1px solid #d8dee6;
+    border-left: 0;
+  }
+
+  .grafana-time-footer {
+    flex-wrap: wrap;
   }
 
   .evidence-row-main {
