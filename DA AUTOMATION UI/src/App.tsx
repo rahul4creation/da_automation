@@ -68,6 +68,7 @@ type LoginResult = {
 };
 
 type DashboardRunMode = "linked" | "fixed" | "single";
+type DashboardAuthMode = "anonymous" | "bearer" | "basic";
 
 type DashboardArtifact = {
   path: string;
@@ -1486,6 +1487,10 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
       "https://msedclgrafana.amnex.co.in:3000/d/ad7931a0-0649-456f-9601-b5f7a14491b8/substation-health-monitor?orgId=1&refresh=5m",
     validationUrl: "",
     navigationUrl: "",
+    grafanaAuthMode: "anonymous" as DashboardAuthMode,
+    grafanaToken: "",
+    grafanaUsername: "",
+    grafanaPassword: "",
     checklistPath: defaultDashboardChecklistPath,
     timeFrom: "now-1h",
     timeTo: "now",
@@ -1505,7 +1510,7 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
 
   const reviewApiBase = useMemo(() => `${window.location.protocol}//${window.location.hostname}:${dashboardReviewApiPort}`, []);
   const parsedMain = useMemo(() => parseDashboardSetupUrl(form.mainUrl, form.baseUrl), [form.mainUrl, form.baseUrl]);
-  const effectiveBaseUrl = normalizeBaseUrl(form.baseUrl || parsedMain?.baseUrl || "");
+  const effectiveBaseUrl = chooseEffectiveDashboardBase(form.baseUrl, parsedMain?.baseUrl || "");
   const readyMessage = dashboardRunReadiness(runMode, form, effectiveBaseUrl);
 
   useEffect(() => {
@@ -1635,9 +1640,7 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
     setRunStatus(`Running ${dashboardModeLabel(runMode).toLowerCase()} through the local dashboard review backend.`);
     const controller = new AbortController();
     const slowStatusTimer = window.setTimeout(() => {
-      setRunStatus(
-        `Still running ${dashboardModeLabel(runMode).toLowerCase()}. This Grafana validation can take around 5 minutes because it queries multiple linked dashboards.`
-      );
+      setRunStatus(dashboardSlowStatusMessage(runMode));
     }, 60000);
     const verySlowStatusTimer = window.setTimeout(() => {
       setRunStatus("Still running. Keep this page open; fresh PDF artifacts will appear when the backend finishes.");
@@ -1655,6 +1658,10 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
           mainUrl: form.mainUrl.trim(),
           validationUrl: form.validationUrl.trim(),
           navigationUrl: form.navigationUrl.trim(),
+          grafanaAuthMode: form.grafanaAuthMode,
+          grafanaToken: form.grafanaToken.trim(),
+          grafanaUsername: form.grafanaUsername.trim(),
+          grafanaPassword: form.grafanaPassword,
           checklistPath: form.checklistPath.trim(),
           actorUserName: username,
           timeFrom: form.timeFrom.trim() || "now-1h",
@@ -1785,6 +1792,51 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
               />
             </label>
           )}
+          <div className="dashboard-field dashboard-field-wide">
+            <span>Grafana access</span>
+            <div className={`dashboard-auth-grid auth-${form.grafanaAuthMode}`}>
+              <select
+                aria-label="Grafana authentication mode"
+                onChange={(event) => updateForm("grafanaAuthMode", event.target.value as DashboardAuthMode)}
+                value={form.grafanaAuthMode}
+              >
+                <option value="anonymous">Anonymous viewer</option>
+                <option value="bearer">Bearer / API token</option>
+                <option value="basic">Basic login</option>
+              </select>
+              {form.grafanaAuthMode === "bearer" && (
+                <input
+                  aria-label="Grafana bearer token"
+                  autoComplete="off"
+                  onChange={(event) => updateForm("grafanaToken", event.target.value)}
+                  placeholder="Paste Grafana service account token"
+                  type="password"
+                  value={form.grafanaToken}
+                />
+              )}
+              {form.grafanaAuthMode === "basic" && (
+                <>
+                  <input
+                    aria-label="Grafana username"
+                    autoComplete="username"
+                    onChange={(event) => updateForm("grafanaUsername", event.target.value)}
+                    placeholder="Grafana username"
+                    type="text"
+                    value={form.grafanaUsername}
+                  />
+                  <input
+                    aria-label="Grafana password"
+                    autoComplete="current-password"
+                    onChange={(event) => updateForm("grafanaPassword", event.target.value)}
+                    placeholder="Grafana password"
+                    type="password"
+                    value={form.grafanaPassword}
+                  />
+                </>
+              )}
+            </div>
+            <small>Use token or login only when Grafana API returns 401 Unauthorized.</small>
+          </div>
           <label className="dashboard-field dashboard-field-wide">
             <span>Checklist</span>
             <div className="dashboard-checklist-picker">
@@ -1958,6 +2010,16 @@ function dashboardModeLabel(mode: DashboardRunMode) {
   if (mode === "fixed") return "Fixed comparison";
   if (mode === "single") return "Single dashboard";
   return "Linked validation";
+}
+
+function dashboardSlowStatusMessage(mode: DashboardRunMode) {
+  if (mode === "fixed") {
+    return "Still running fixed comparison. It is comparing only the two supplied dashboards; slow Grafana datasource queries will be marked in the review output when they fail.";
+  }
+  if (mode === "single") {
+    return "Still running single dashboard review. The backend is querying the supplied dashboard panels and preparing fresh artifacts.";
+  }
+  return "Still running linked validation. This can take around 5 minutes because it follows linked dashboard routes and queries the target panels.";
 }
 
 function dashboardRunReadiness(
@@ -2310,6 +2372,30 @@ function normalizeBaseUrl(value: string) {
   } catch {
     return raw.replace(/\/+$/, "");
   }
+}
+
+function chooseEffectiveDashboardBase(submittedBase: string, detectedBase: string) {
+  const submitted = normalizeBaseUrl(submittedBase);
+  const detected = normalizeBaseUrl(detectedBase);
+  if (!submitted) return detected;
+  if (!detected) return submitted;
+
+  try {
+    const submittedUrl = new URL(submitted);
+    const detectedUrl = new URL(detected);
+    const sameOrigin =
+      submittedUrl.protocol.toLowerCase() === detectedUrl.protocol.toLowerCase() &&
+      submittedUrl.host.toLowerCase() === detectedUrl.host.toLowerCase();
+    const submittedPath = submittedUrl.pathname.replace(/\/+$/, "");
+    const detectedPath = detectedUrl.pathname.replace(/\/+$/, "");
+    if (sameOrigin && detectedPath && (!submittedPath || detectedPath === submittedPath || detectedPath.startsWith(`${submittedPath}/`))) {
+      return detected;
+    }
+  } catch {
+    return submitted;
+  }
+
+  return submitted;
 }
 
 function ensureTrailingSlash(value: string) {

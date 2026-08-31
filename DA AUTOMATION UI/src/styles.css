@@ -577,6 +577,21 @@ button {
   min-height: 44px;
 }
 
+.dashboard-auth-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.dashboard-auth-grid.auth-anonymous {
+  grid-template-columns: minmax(180px, 260px);
+}
+
+.dashboard-auth-grid.auth-basic {
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .dashboard-field-wide {
   grid-column: 1 / -1;
 }
@@ -4052,6 +4067,9 @@ button {
   .dashboard-context-strip,
   .dashboard-setup-grid,
   .dashboard-time-range-row,
+  .dashboard-auth-grid,
+  .dashboard-auth-grid.auth-anonymous,
+  .dashboard-auth-grid.auth-basic,
   .embedded-review-grid .review-stage-list,
   .finding-meaning-grid,
   .step-path,
