@@ -9,11 +9,13 @@ import {
   Clock,
   Download,
   Eye,
+  FileCheck2,
   FileText,
   FolderPlus,
   LogOut,
   Loader2,
   Play,
+  Plus,
   RefreshCw,
   Save,
   Search,
@@ -21,9 +23,10 @@ import {
   Upload,
   UserPlus,
   UserRound,
+  X,
   XCircle
 } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import ExcelPdfReviewApp from "./ExcelPdfReviewApp";
 import {
   GateRow,
@@ -47,6 +50,7 @@ const defaultReviewPhaseId = "05-ai-review-validation";
 const dashboardReviewClientTimeoutMs = 10 * 60 * 1000;
 const dashboardReviewApiPort = "8006";
 const defaultDashboardChecklistPath = "C:\\Users\\Dell_PC\\Downloads\\COMMON CHECK LIST (1).xlsx";
+const dashboardLatestChecklistPreferenceKey = "da-review-dashboard-latest-checklist";
 
 type CreateUserInput = {
   adminUsername: string;
@@ -86,6 +90,50 @@ type DashboardChecklistOption = {
   path: string;
   exists?: boolean;
   isDefault?: boolean;
+  revisionMajor?: number;
+  revisionMinor?: number;
+  revisionNumber?: number;
+  revisionLabel?: string;
+  modifiedAt?: string;
+  uploaded?: boolean;
+};
+
+type DashboardChecklistSheetInfo = {
+  name: string;
+  maxRow?: number;
+  maxColumn?: number;
+  headerRow?: number;
+  serialColumn?: number;
+  pointColumn?: number;
+  pointCount?: number;
+};
+
+type DashboardChecklistGridRow = {
+  rowNumber: number;
+  values: string[];
+};
+
+type DashboardChecklistGridResponse = {
+  sheetName: string;
+  headerRow: number;
+  firstDataRow: number;
+  maxColumn: number;
+  serialColumn: number;
+  pointColumn: number;
+  columns: string[];
+  rows: DashboardChecklistGridRow[];
+};
+
+type DashboardChecklistRevisionResponse = {
+  ok: boolean;
+  revisionLabel?: string;
+  createdFile?: DashboardChecklistOption;
+  saved?: {
+    savedPath?: string;
+    sheetName?: string;
+    updatedCount?: number;
+  };
+  checklists?: DashboardChecklistOption[];
 };
 
 const fallbackDashboardChecklistOptions: DashboardChecklistOption[] = [
@@ -1482,6 +1530,7 @@ function ReviewAgentInfo({ project }: { project: ProjectDetail }) {
 function DashboardReviewPlaceholder({ project, username }: { project: ProjectDetail; username: string }) {
   const [runMode, setRunMode] = useState<DashboardRunMode>("linked");
   const [form, setForm] = useState(() => ({
+    projectName: project.projectName || project.projectId || "",
     baseUrl: "https://msedclgrafana.amnex.co.in:3000",
     mainUrl:
       "https://msedclgrafana.amnex.co.in:3000/d/ad7931a0-0649-456f-9601-b5f7a14491b8/substation-health-monitor?orgId=1&refresh=5m",
@@ -1505,13 +1554,30 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
   const [checklistOptions, setChecklistOptions] = useState<DashboardChecklistOption[]>(fallbackDashboardChecklistOptions);
   const [checklistStatus, setChecklistStatus] = useState("Using the shared dashboard checklist by default.");
   const [checklistUploading, setChecklistUploading] = useState(false);
+  const [autoSelectLatestChecklist, setAutoSelectLatestChecklist] = useState(() => localStorage.getItem(dashboardLatestChecklistPreferenceKey) === "true");
+  const [checklistSheets, setChecklistSheets] = useState<DashboardChecklistSheetInfo[]>([]);
+  const [selectedChecklistSheet, setSelectedChecklistSheet] = useState("");
+  const [checklistGrid, setChecklistGrid] = useState<DashboardChecklistGridResponse | null>(null);
+  const [loadingChecklistGrid, setLoadingChecklistGrid] = useState(false);
+  const [savingChecklistRevision, setSavingChecklistRevision] = useState(false);
+  const [checklistRevisionStatus, setChecklistRevisionStatus] = useState("Select a checklist sheet to edit it here.");
   const [running, setRunning] = useState(false);
   const checklistFileInputRef = useRef<HTMLInputElement | null>(null);
+  const checklistSheetsRequestRef = useRef(0);
+  const checklistGridRequestRef = useRef(0);
 
   const reviewApiBase = useMemo(() => `${window.location.protocol}//${window.location.hostname}:${dashboardReviewApiPort}`, []);
   const parsedMain = useMemo(() => parseDashboardSetupUrl(form.mainUrl, form.baseUrl), [form.mainUrl, form.baseUrl]);
   const effectiveBaseUrl = chooseEffectiveDashboardBase(form.baseUrl, parsedMain?.baseUrl || "");
   const readyMessage = dashboardRunReadiness(runMode, form, effectiveBaseUrl);
+  const selectedChecklistOption = checklistOptions.find((option) => sameDashboardChecklistPath(option.path, form.checklistPath));
+  const checklistGridColumns = checklistGrid?.columns?.length ? checklistGrid.columns : ["S.No", "Check Point"];
+  const checklistGridRows = checklistGrid?.rows || [];
+  const checklistSerialColumnIndex =
+    typeof checklistGrid?.serialColumn === "number" && checklistGrid.serialColumn > 0 ? checklistGrid.serialColumn - 1 : -1;
+  const checklistGridTemplate = {
+    "--editor-columns": `54px repeat(${checklistGridColumns.length}, minmax(150px, 1fr)) 38px`
+  } as CSSProperties;
 
   useEffect(() => {
     if (!autoTimestamp || running) return;
@@ -1525,6 +1591,43 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
     void loadDashboardChecklists();
     void loadDashboardArtifacts("");
   }, []);
+
+  useEffect(() => {
+    updateForm("projectName", project.projectName || project.projectId || "");
+  }, [project.projectId, project.projectName]);
+
+  useEffect(() => {
+    if (!autoSelectLatestChecklist || !checklistOptions.length || !form.checklistPath) return;
+    const latestChecklist = latestDashboardChecklistForSelection(checklistOptions, form.checklistPath);
+    if (!latestChecklist || sameDashboardChecklistPath(latestChecklist.path, form.checklistPath)) return;
+    updateForm("checklistPath", latestChecklist.path);
+    setChecklistStatus(`Latest checklist revision selected: ${latestChecklist.label}.`);
+  }, [autoSelectLatestChecklist, checklistOptions, form.checklistPath]);
+
+  useEffect(() => {
+    const requestId = ++checklistSheetsRequestRef.current;
+    checklistGridRequestRef.current += 1;
+    setChecklistSheets([]);
+    setSelectedChecklistSheet("");
+    setChecklistGrid(null);
+    setLoadingChecklistGrid(false);
+    if (!form.checklistPath) {
+      setChecklistRevisionStatus("Embedded fallback is available for review runs, but checklist editing needs a selected .xlsx file.");
+      return;
+    }
+    void loadDashboardChecklistSheets(form.checklistPath, requestId);
+  }, [form.checklistPath]);
+
+  useEffect(() => {
+    const requestId = ++checklistGridRequestRef.current;
+    if (!form.checklistPath || !selectedChecklistSheet) {
+      setChecklistGrid(null);
+      setLoadingChecklistGrid(false);
+      return;
+    }
+    setChecklistGrid(null);
+    void loadDashboardChecklistSheetGrid(form.checklistPath, selectedChecklistSheet, requestId);
+  }, [form.checklistPath, selectedChecklistSheet]);
 
   function updateForm(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -1548,7 +1651,7 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
       }
       const options = payload.checklists as DashboardChecklistOption[];
       setChecklistOptions(options);
-      const activeOption = options.find((option) => option.path === form.checklistPath);
+      const activeOption = options.find((option) => sameDashboardChecklistPath(option.path, form.checklistPath));
       const defaultOption = options.find((option) => option.isDefault && option.exists !== false);
       if (!activeOption && defaultOption) {
         updateForm("checklistPath", defaultOption.path);
@@ -1597,6 +1700,181 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
     } finally {
       setChecklistUploading(false);
     }
+  }
+
+  function selectDashboardChecklist(selectedPath: string) {
+    const selected = checklistOptions.find((option) => sameDashboardChecklistPath(option.path, selectedPath));
+    updateForm("checklistPath", selectedPath);
+    setChecklistStatus(
+      selected
+        ? `Checklist selected: ${selected.label}${selected.exists === false ? " (file not found, fallback will be used)" : ""}.`
+        : "Embedded dashboard checklist fallback will be used."
+    );
+  }
+
+  function toggleAutoSelectLatestDashboardChecklist(checked: boolean) {
+    setAutoSelectLatestChecklist(checked);
+    localStorage.setItem(dashboardLatestChecklistPreferenceKey, checked ? "true" : "false");
+    if (!checked || !form.checklistPath) return;
+    const latestChecklist = latestDashboardChecklistForSelection(checklistOptions, form.checklistPath);
+    if (latestChecklist) {
+      updateForm("checklistPath", latestChecklist.path);
+      setChecklistStatus(`Latest checklist revision selected: ${latestChecklist.label}.`);
+    }
+  }
+
+  async function loadDashboardChecklistSheets(checklistPath: string, requestId = ++checklistSheetsRequestRef.current) {
+    try {
+      setChecklistRevisionStatus("Reading checklist workbook sheets.");
+      const endpoint = new URL(`${reviewApiBase}/api/dashboard-checklists/inspect`);
+      endpoint.searchParams.set("path", checklistPath);
+      const response = await fetch(endpoint.toString());
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || !Array.isArray(payload.sheets)) {
+        throw new Error(payload.error || `Checklist inspect failed with HTTP ${response.status}.`);
+      }
+      if (requestId !== checklistSheetsRequestRef.current) return;
+      const sheets = payload.sheets as DashboardChecklistSheetInfo[];
+      setChecklistSheets(sheets);
+      setSelectedChecklistSheet(sheets[0]?.name || "");
+      if (Array.isArray(payload.checklists)) {
+        setChecklistOptions(payload.checklists as DashboardChecklistOption[]);
+      }
+      setChecklistRevisionStatus(
+        sheets.length ? `${sheets.length} checklist sheet(s) ready. Select a sheet to edit.` : "No sheets were found in the selected checklist."
+      );
+    } catch (error) {
+      if (requestId !== checklistSheetsRequestRef.current) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setChecklistSheets([]);
+      setSelectedChecklistSheet("");
+      setChecklistGrid(null);
+      setChecklistRevisionStatus(`Checklist workbook could not be read: ${message}`);
+    }
+  }
+
+  async function loadDashboardChecklistSheetGrid(checklistPath: string, sheetName: string, requestId = ++checklistGridRequestRef.current) {
+    try {
+      setLoadingChecklistGrid(true);
+      const endpoint = new URL(`${reviewApiBase}/api/dashboard-checklists/sheet`);
+      endpoint.searchParams.set("path", checklistPath);
+      endpoint.searchParams.set("sheetName", sheetName);
+      const response = await fetch(endpoint.toString());
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || !Array.isArray(payload.rows) || !Array.isArray(payload.columns)) {
+        throw new Error(payload.error || `Checklist sheet refresh failed with HTTP ${response.status}.`);
+      }
+      if (requestId !== checklistGridRequestRef.current) return;
+      const result = payload as DashboardChecklistGridResponse;
+      setChecklistGrid({
+        ...result,
+        rows: result.rows.map((row) => ({
+          ...row,
+          values: normalizeDashboardChecklistGridValues(row.values, result.columns.length)
+        }))
+      });
+      setChecklistRevisionStatus(`${result.rows.length} checklist row(s) loaded from ${result.sheetName}.`);
+    } catch (error) {
+      if (requestId !== checklistGridRequestRef.current) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setChecklistGrid(null);
+      setChecklistRevisionStatus(`Checklist sheet could not be loaded: ${message}`);
+    } finally {
+      if (requestId === checklistGridRequestRef.current) {
+        setLoadingChecklistGrid(false);
+      }
+    }
+  }
+
+  function updateDashboardChecklistGridCell(rowIndex: number, columnIndex: number, value: string) {
+    if (checklistSerialColumnIndex >= 0 && columnIndex === checklistSerialColumnIndex) return;
+    setChecklistGrid((current) => {
+      if (!current) return current;
+      const rows = current.rows.map((row, index) => {
+        if (index !== rowIndex) return row;
+        const values = normalizeDashboardChecklistGridValues(row.values, current.columns.length);
+        values[columnIndex] = value;
+        return { ...row, values };
+      });
+      return { ...current, rows };
+    });
+  }
+
+  function addDashboardChecklistGridRow() {
+    setChecklistGrid((current) => {
+      if (!current) return current;
+      const values = Array.from({ length: current.columns.length }, () => "");
+      if (current.serialColumn > 0) {
+        values[Math.max(0, current.serialColumn - 1)] = String(current.rows.length + 1);
+      }
+      return {
+        ...current,
+        rows: [...current.rows, { rowNumber: 0, values }]
+      };
+    });
+  }
+
+  function removeDashboardChecklistGridRow(rowIndex: number) {
+    setChecklistGrid((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        rows: current.rows.filter((_, index) => index !== rowIndex)
+      };
+    });
+  }
+
+  async function saveDashboardChecklistWorkbookRevision() {
+    if (!checklistGrid || !selectedChecklistSheet || !form.checklistPath) {
+      setChecklistRevisionStatus("Select a checklist sheet before saving.");
+      return;
+    }
+    const editableRows = checklistGrid.rows
+      .map((row) => normalizeDashboardChecklistGridValues(row.values, checklistGrid.columns.length))
+      .filter((values) =>
+        values.some((value, index) => (checklistSerialColumnIndex < 0 || index !== checklistSerialColumnIndex) && value.trim())
+      );
+    if (!editableRows.length) {
+      setChecklistRevisionStatus("At least one checklist row is required before saving.");
+      return;
+    }
+
+    try {
+      setSavingChecklistRevision(true);
+      setChecklistRevisionStatus("Saving edited checklist as a new revision.");
+      const response = await fetch(`${reviewApiBase}/api/dashboard-checklists/revision/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: form.checklistPath,
+          sheetName: selectedChecklistSheet,
+          rows: editableRows
+        })
+      });
+      const payload = (await response.json().catch(() => ({}))) as DashboardChecklistRevisionResponse & { error?: string };
+      if (!response.ok || !payload.ok || !payload.createdFile?.path) {
+        throw new Error(payload.error || `Checklist revision save failed with HTTP ${response.status}.`);
+      }
+      if (Array.isArray(payload.checklists)) {
+        setChecklistOptions(payload.checklists);
+      }
+      updateForm("checklistPath", payload.createdFile.path);
+      setChecklistStatus(`Checklist saved and selected: ${payload.createdFile.label}.`);
+      setChecklistRevisionStatus(
+        `Checklist saved as ${payload.createdFile.label}${payload.revisionLabel ? ` (${payload.revisionLabel})` : ""}; ${payload.saved?.updatedCount || editableRows.length} row(s) saved.`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setChecklistRevisionStatus(`Checklist revision save failed: ${message}`);
+    } finally {
+      setSavingChecklistRevision(false);
+    }
+  }
+
+  function dashboardChecklistDownloadUrl(pathValue: string) {
+    const endpoint = new URL(`${reviewApiBase}/api/dashboard-checklists/download`);
+    endpoint.searchParams.set("path", pathValue);
+    return endpoint.toString();
   }
 
   async function loadDashboardArtifacts(folder = artifactFolder) {
@@ -1663,7 +1941,9 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
           grafanaUsername: form.grafanaUsername.trim(),
           grafanaPassword: form.grafanaPassword,
           checklistPath: form.checklistPath.trim(),
+          projectName: form.projectName.trim() || project.projectName || project.projectId,
           actorUserName: username,
+          reviewerName: username,
           timeFrom: form.timeFrom.trim() || "now-1h",
           timeTo: form.timeTo.trim() || "now",
           reviewTimestamp: latestTimestamp
@@ -1728,15 +2008,6 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
 
         <div className="dashboard-setup-grid">
           <label className="dashboard-field">
-            <span>Grafana base URL</span>
-            <input
-              onChange={(event) => updateForm("baseUrl", event.target.value)}
-              placeholder="https://grafana.example.com or https://host/grafana"
-              type="url"
-              value={form.baseUrl}
-            />
-          </label>
-          <label className="dashboard-field">
             <span>Review timestamp</span>
             <div className="dashboard-inline-field">
               <input
@@ -1760,6 +2031,24 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
                 Now
               </button>
             </div>
+          </label>
+          <label className="dashboard-field">
+            <span>Project name</span>
+            <input
+              onChange={(event) => updateForm("projectName", event.target.value)}
+              placeholder="Project name for review file"
+              type="text"
+              value={form.projectName}
+            />
+          </label>
+          <label className="dashboard-field">
+            <span>Grafana base URL</span>
+            <input
+              onChange={(event) => updateForm("baseUrl", event.target.value)}
+              placeholder="https://grafana.example.com or https://host/grafana"
+              type="url"
+              value={form.baseUrl}
+            />
           </label>
           <label className="dashboard-field dashboard-field-wide">
             <span>Main dashboard URL</span>
@@ -1837,52 +2126,171 @@ function DashboardReviewPlaceholder({ project, username }: { project: ProjectDet
             </div>
             <small>Use token or login only when Grafana API returns 401 Unauthorized.</small>
           </div>
-          <label className="dashboard-field dashboard-field-wide">
-            <span>Checklist</span>
-            <div className="dashboard-checklist-picker">
+          <section className="dashboard-checklist-editor dashboard-field-wide">
+            <div className="checklist-editor-head">
+              <div>
+                <span className="eyebrow">Checklist Excel Editor</span>
+                <strong>Checklist Workbook Editor</strong>
+                <small>Edit the selected checklist sheet in the browser. Save creates a new checklist file revision.</small>
+              </div>
+              <span>{selectedChecklistOption?.revisionLabel || "Rev 0.0 to 0.10, then 1.0 to 1.10"}</span>
+            </div>
+            <label className="dashboard-field dashboard-field-wide">
+              <span>Checklist selection</span>
+              <div className="dashboard-checklist-picker">
+                <select
+                  disabled={checklistUploading || savingChecklistRevision}
+                  onChange={(event) => selectDashboardChecklist(event.target.value)}
+                  value={form.checklistPath}
+                >
+                  {checklistOptions.map((option) => (
+                    <option key={`${option.path || "embedded"}-${option.label}`} value={option.path}>
+                      {option.label}
+                      {option.isDefault ? " (default)" : ""}
+                      {option.exists === false ? " (missing)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden-input"
+                  onChange={(event) => {
+                    void uploadDashboardChecklist(event.target.files);
+                    event.target.value = "";
+                  }}
+                  ref={checklistFileInputRef}
+                  type="file"
+                />
+                <button
+                  className="secondary-btn dashboard-browse-btn"
+                  disabled={checklistUploading || running || savingChecklistRevision}
+                  onClick={() => checklistFileInputRef.current?.click()}
+                  type="button"
+                >
+                  {checklistUploading ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}
+                  Browse
+                </button>
+                <a
+                  className={`secondary-btn dashboard-browse-btn dashboard-checklist-download ${form.checklistPath ? "" : "disabled"}`}
+                  href={form.checklistPath ? dashboardChecklistDownloadUrl(form.checklistPath) : "#"}
+                  onClick={(event) => {
+                    if (!form.checklistPath) {
+                      event.preventDefault();
+                      setChecklistRevisionStatus("Select a checklist .xlsx file before downloading.");
+                    }
+                  }}
+                >
+                  <Download size={16} />
+                  Download
+                </a>
+              </div>
+              <small>{checklistStatus}</small>
+            </label>
+            <label className="latest-checklist-option">
+              <input
+                checked={autoSelectLatestChecklist}
+                onChange={(event) => toggleAutoSelectLatestDashboardChecklist(event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                <strong>Always select latest checklist revision</strong>
+                <small>When the page opens, refreshes, or a revision is saved, the newest revision for this checklist will be selected.</small>
+              </span>
+            </label>
+            <label className="dashboard-field dashboard-field-wide">
+              <span>Checklist sheet</span>
               <select
-                onChange={(event) => {
-                  const selectedPath = event.target.value;
-                  const selected = checklistOptions.find((option) => option.path === selectedPath);
-                  updateForm("checklistPath", selectedPath);
-                  setChecklistStatus(
-                    selected
-                      ? `Checklist selected: ${selected.label}${selected.exists === false ? " (file not found, fallback will be used)" : ""}.`
-                      : "Embedded dashboard checklist fallback will be used."
-                  );
-                }}
-                value={form.checklistPath}
+                disabled={!checklistSheets.length || savingChecklistRevision}
+                onChange={(event) => setSelectedChecklistSheet(event.target.value)}
+                value={selectedChecklistSheet}
               >
-                {checklistOptions.map((option) => (
-                  <option key={`${option.path || "embedded"}-${option.label}`} value={option.path}>
-                    {option.label}
-                    {option.isDefault ? " (default)" : ""}
-                    {option.exists === false ? " (missing)" : ""}
+                {!checklistSheets.length && <option value="">No sheet loaded</option>}
+                {checklistSheets.map((sheet) => (
+                  <option key={sheet.name} value={sheet.name}>
+                    {sheet.name} ({sheet.pointCount || 0} point{sheet.pointCount === 1 ? "" : "s"})
                   </option>
                 ))}
               </select>
-              <input
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                className="hidden-input"
-                onChange={(event) => {
-                  void uploadDashboardChecklist(event.target.files);
-                  event.target.value = "";
-                }}
-                ref={checklistFileInputRef}
-                type="file"
-              />
+            </label>
+            <div className="excel-editor-toolbar">
               <button
-                className="secondary-btn dashboard-browse-btn"
-                disabled={checklistUploading || running}
-                onClick={() => checklistFileInputRef.current?.click()}
+                className="secondary-btn"
+                disabled={loadingChecklistGrid || !form.checklistPath || !selectedChecklistSheet || savingChecklistRevision}
+                onClick={() => selectedChecklistSheet && void loadDashboardChecklistSheetGrid(form.checklistPath, selectedChecklistSheet)}
                 type="button"
               >
-                {checklistUploading ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}
-                Browse
+                {loadingChecklistGrid ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
+                Refresh Sheet
+              </button>
+              <button className="secondary-btn" disabled={!checklistGrid || savingChecklistRevision} onClick={addDashboardChecklistGridRow} type="button">
+                <Plus size={16} />
+                Add Row
               </button>
             </div>
-            <small>{checklistStatus}</small>
-          </label>
+            <div className="excel-editor-grid dashboard-checklist-grid" style={checklistGridTemplate}>
+              <div className="excel-editor-row heading">
+                <span>#</span>
+                {checklistGridColumns.map((column, index) => (
+                  <span key={`${column}-${index}`}>{column}</span>
+                ))}
+                <span />
+              </div>
+              {loadingChecklistGrid && <div className="excel-editor-empty">Loading checklist sheet...</div>}
+              {!loadingChecklistGrid &&
+                checklistGridRows.map((row, rowIndex) => {
+                  const values = normalizeDashboardChecklistGridValues(row.values, checklistGridColumns.length);
+                  return (
+                    <div className="excel-editor-row" key={`${row.rowNumber}-${rowIndex}`}>
+                      <strong>{rowIndex + 1}</strong>
+                      {checklistGridColumns.map((column, columnIndex) => (
+                        <input
+                          aria-label={`${column} row ${rowIndex + 1}`}
+                          className={checklistSerialColumnIndex >= 0 && columnIndex === checklistSerialColumnIndex ? "locked" : ""}
+                          key={`${column}-${columnIndex}`}
+                          onChange={(event) => updateDashboardChecklistGridCell(rowIndex, columnIndex, event.target.value)}
+                          readOnly={checklistSerialColumnIndex >= 0 && columnIndex === checklistSerialColumnIndex}
+                          title={
+                            checklistSerialColumnIndex >= 0 && columnIndex === checklistSerialColumnIndex
+                              ? "Serial number is generated on save."
+                              : column
+                          }
+                          value={
+                            checklistSerialColumnIndex >= 0 && columnIndex === checklistSerialColumnIndex
+                              ? String(rowIndex + 1)
+                              : values[columnIndex] || ""
+                          }
+                        />
+                      ))}
+                      <button
+                        aria-label={`Remove row ${rowIndex + 1}`}
+                        className="icon-btn danger-icon"
+                        disabled={savingChecklistRevision}
+                        onClick={() => removeDashboardChecklistGridRow(rowIndex)}
+                        title="Remove row"
+                        type="button"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  );
+                })}
+              {!loadingChecklistGrid && !checklistGridRows.length && (
+                <div className="excel-editor-empty">No editable rows found in the selected sheet.</div>
+              )}
+            </div>
+            <div className="checklist-editor-actions">
+              <small>{checklistRevisionStatus}</small>
+              <button
+                className="secondary-btn"
+                disabled={savingChecklistRevision || !selectedChecklistSheet || !checklistGridRows.length}
+                onClick={saveDashboardChecklistWorkbookRevision}
+                type="button"
+              >
+                {savingChecklistRevision ? <Loader2 className="spin" size={16} /> : <FileCheck2 size={16} />}
+                Save Edited Revision
+              </button>
+            </div>
+          </section>
           <DashboardTimeRangePicker
             onTimeFromChange={(value) => updateForm("timeFrom", value)}
             onTimeToChange={(value) => updateForm("timeTo", value)}
@@ -2004,6 +2412,60 @@ function dashboardReviewArtifactUrl(pathValue: string, download = false, usernam
 
 function fileNameFromPath(pathValue: string) {
   return pathValue.split(/[\\/]/).pop() || pathValue || "dashboard-review.pdf";
+}
+
+function normalizeDashboardChecklistGridValues(values: unknown[], columnCount: number) {
+  return Array.from({ length: columnCount }, (_, index) => {
+    const value = values[index];
+    if (value === null || value === undefined) return "";
+    return String(value);
+  });
+}
+
+function sameDashboardChecklistPath(left: string, right: string) {
+  return normalizeDashboardChecklistPath(left) === normalizeDashboardChecklistPath(right);
+}
+
+function normalizeDashboardChecklistPath(value: string) {
+  return value.replace(/\//g, "\\").trim().toLowerCase();
+}
+
+function latestDashboardChecklistForSelection(checklists: DashboardChecklistOption[], selectedPath: string) {
+  if (!checklists.length) return null;
+  const selectedFile = checklists.find((file) => sameDashboardChecklistPath(file.path, selectedPath));
+  const selectedFamily = dashboardChecklistFamilyName(selectedFile?.label || selectedPath);
+  const candidates = selectedFamily
+    ? checklists.filter((file) => file.path && file.exists !== false && dashboardChecklistFamilyName(file.label || file.path) === selectedFamily)
+    : checklists.filter((file) => file.path && file.exists !== false);
+  return candidates.reduce<DashboardChecklistOption | null>((latest, file) => {
+    if (!latest) return file;
+    const revisionDiff = dashboardChecklistRevisionValue(file) - dashboardChecklistRevisionValue(latest);
+    if (revisionDiff > 0) return file;
+    if (revisionDiff < 0) return latest;
+    const timeDiff = Date.parse(file.modifiedAt || "") - Date.parse(latest.modifiedAt || "");
+    if (timeDiff > 0) return file;
+    if (timeDiff < 0) return latest;
+    return (file.label || file.path).localeCompare(latest.label || latest.path) > 0 ? file : latest;
+  }, null);
+}
+
+function dashboardChecklistRevisionValue(file: DashboardChecklistOption) {
+  if (typeof file.revisionNumber === "number") return file.revisionNumber;
+  if (typeof file.revisionMajor === "number" || typeof file.revisionMinor === "number") {
+    return Number(file.revisionMajor || 0) * 11 + Number(file.revisionMinor || 0);
+  }
+  const match = (file.label || file.path || "").match(/rev(?:ision)?\s*(\d+)\.(\d+)/i);
+  if (!match) return 0;
+  return Number(match[1] || 0) * 11 + Number(match[2] || 0);
+}
+
+function dashboardChecklistFamilyName(value: string) {
+  const fileName = fileNameFromPath(value);
+  return fileName
+    .replace(/\.[^.]+$/, "")
+    .replace(/\s*[\[(]?\s*rev(?:ision)?\s*\d+\.\d+\s*[\])]?\s*$/i, "")
+    .trim()
+    .toLowerCase();
 }
 
 function dashboardModeLabel(mode: DashboardRunMode) {

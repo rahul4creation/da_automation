@@ -572,6 +572,34 @@ button {
   flex: 1 1 auto;
 }
 
+.dashboard-checklist-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #cfd9e3;
+  border-radius: 8px;
+  background: #f8fbfc;
+}
+
+.dashboard-checklist-editor .dashboard-field {
+  gap: 6px;
+}
+
+.dashboard-checklist-download {
+  text-decoration: none;
+}
+
+.dashboard-checklist-download.disabled {
+  pointer-events: auto;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.dashboard-checklist-grid {
+  max-height: 300px;
+}
+
 .dashboard-browse-btn {
   flex: 0 0 auto;
   min-height: 44px;
