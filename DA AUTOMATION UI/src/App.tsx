@@ -1528,7 +1528,7 @@ function ReviewAgentInfo({ project }: { project: ProjectDetail }) {
 }
 
 function DashboardReviewPlaceholder({ project, username }: { project: ProjectDetail; username: string }) {
-  const [runMode, setRunMode] = useState<DashboardRunMode>("linked");
+  const [runMode, setRunMode] = useState<DashboardRunMode>("fixed");
   const [form, setForm] = useState(() => ({
     projectName: project.projectName || project.projectId || "",
     baseUrl: "https://msedclgrafana.amnex.co.in:3000",
